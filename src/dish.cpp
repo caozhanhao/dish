@@ -13,6 +13,7 @@
 //   limitations under the License.
 #include "error.h"
 #include "parser.h"
+#include "lexer.h"
 #include "command.h"
 #include "utils.h"
 #include <iostream>
@@ -21,12 +22,17 @@
 
 namespace dish
 {
+  DishInfo::DishInfo(Dish *d) : dish(d), last_ret(0) {}
+  
+  Dish::Dish() : info(this) {}
+  
   void Dish::run(const std::string &cmd)
   {
     history.emplace_back(cmd);
     try
     {
-      parser::Parser parser{this, cmd};
+      lexer::Lexer lexer{cmd};
+      parser::Parser parser{&info, lexer.get_all_tokens()};
       parser.parse();
       parser.get_cmd().execute();
     }
@@ -52,11 +58,12 @@ namespace dish
       getcwd(cwd, sizeof(cwd));
       auto uid = getuid();
       auto s = utils::colorify(getpwuid(uid)->pw_name, utils::Color::LIGHT_BLUE);
-      utils::print("%s Dish %s @ %s in %s \n%s ",
+      utils::print("%s Dish %s @ %s in %s %s \n%s",
                    utils::colorify("#", utils::Color::LIGHT_BLUE).c_str(),
                    utils::colorify(getpwuid(uid)->pw_name, utils::Color::LIGHT_BLUE).c_str(),
                    utils::colorify(hostname, utils::Color::GREEN).c_str(),
                    utils::colorify(utils::simplify_path(cwd), utils::Color::YELLOW).c_str(),
+                   utils::colorify("ret: " + std::to_string(info.last_ret), utils::Color::RED).c_str(),
                    utils::colorify(uid == 0 ? "#" : "$", utils::Color::RED).c_str()
       );
       std::getline(std::cin, cmd);

@@ -22,7 +22,7 @@ int main(int argc, char **argv)
   option::Option option(argc, argv);
   option.add("dish", [&dish](option::Option::CallbackArgType args)
   {
-    for (auto &cmd: args)
+    for (auto &cmd:args)
     {
       dish.run(cmd);
     }

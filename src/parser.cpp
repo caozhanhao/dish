@@ -12,6 +12,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 #include "error.h"
+#include "lexer.h"
 #include "command.h"
 #include "parser.h"
 #include <string>
@@ -19,172 +20,90 @@
 
 namespace dish::parser
 {
-  TokenType Token::get_type() const { return type; }
   
-  std::string Token::get_content() const { return content; }
-  
-  std::size_t Token::get_pos() const { return pos; }
-  
-  std::size_t Token::get_size() const { return size; }
-  
-  void Token::set_content(std::string c) { content = std::move(c); }
-  
-  Parser::Parser(Dish *dish_, std::string cmd) : text(std::move(cmd)), state(State::init), pos(0), dish(dish_) {}
+  Parser::Parser(DishInfo *info_, std::vector<lexer::Token> tokens_)
+      : info(info_), scmd(nullptr), command(info_), tokens(tokens_), pos(0) {}
   
   void Parser::parse()
   {
-    std::vector<Token> tokens{get_tokens()};
-    for (auto &t: tokens)
+    pos = 0;
+    while (pos < tokens.size())
     {
-      parse_token(t);
+      switch (tokens[pos].get_type())
+      {
+        case lexer::TokenType::word:
+          parse_cmd(command);
+          break;
+        case lexer::TokenType::if_tok:
+          parse_if();
+          break;
+      }
     }
-    if (!tmp.empty())
-    {
-      command.insert(tmp);
-    }
-    command.set_dish(dish);
   }
   
   cmd::Command Parser::get_cmd() const { return command; }
   
-  std::vector<Token> Parser::get_tokens() const
+  void Parser::parse_if()
   {
-    std::vector<Token> tokens;
-    for (auto it = text.cbegin(); it < text.cend(); ++it)
+    ++pos;//skip if
+    cmd::Command condition{info};
+    parse_cmd(condition);
+    ++pos;//skip then
+    cmd::Command true_case{info};
+    cmd::Command false_case{info};
+    parse_cmd(true_case);
+    if (tokens[pos].get_type() == lexer::TokenType::else_tok)
     {
-      auto &ch = *it;
-      if (ch == ' ') continue;
-      if (ch == '\n')
-      {
-        tokens.emplace_back(TokenType::newline, "\n", it - text.cbegin(), 0);
-        continue;
-      }
-      else if (ch == '|')
-      {
-        tokens.emplace_back(TokenType::pipe, "", it - text.cbegin(), 1);
-        continue;
-      }
-      else if (ch == '&')
-      {
-        tokens.emplace_back(TokenType::background, "", it - text.cbegin(), 1);
-        continue;
-      }
-      else if (ch == '<')
-      {
-        tokens.emplace_back(TokenType::input, "", it - text.cbegin(), 1);
-        continue;
-      }
-      else if (ch == '>')
-      {
-        if (it < text.cend() - 1 && *(it + 1) == '>')
-        {
-          if (it < text.cend() - 2 && *(it + 2) == '&')
-          {
-            tokens.emplace_back(TokenType::great2_ampersand, "", it - text.cbegin(), 3);
-            it += 2;
-          }
-          else
-          {
-            tokens.emplace_back(TokenType::appending, "", it - text.cbegin(), 2);
-            ++it;
-          }
-        }
-        else if (it < text.cend() - 1 && *(it + 1) == '&')
-        {
-          tokens.emplace_back(TokenType::great_ampersand, "", it - text.cbegin(), 2);
-          ++it;
-        }
-        else
-        {
-          tokens.emplace_back(TokenType::output, "", it - text.cbegin(), 1);
-        }
-        continue;
-      }
-      else
-      {
-        std::string tmp;
-        do
-        {
-          tmp += *it;
-          ++it;
-        } while (it < text.cend() && !std::isspace(*it));
-        std::size_t sz = tmp.size();
-        if (!tokens.empty() && tokens.back().get_type() != TokenType::word)
-        {
-          tokens.back().set_content(tmp);
-        }
-        else
-        {
-          tokens.emplace_back(TokenType::word, tmp, it - text.cbegin(), sz);
-        }
-      }
+      ++pos;
+      parse_cmd(false_case);
     }
-    return tokens;
+    ++pos;//fi
+    command.insert(std::make_shared<cmd::IfCmd>(
+        std::make_shared<cmd::Command>(condition),
+        std::make_shared<cmd::Command>(true_case),
+        std::make_shared<cmd::Command>(false_case)));
   }
   
-  void Parser::parse_token(const Token &token)
+  void Parser::parse_cmd(cmd::Command &cmd)
   {
-    switch (state)
+    auto add_scmd = [&cmd, this]()
     {
-      case State::init:
-        switch (token.get_type())
+      cmd::SimpleCmd scmd;
+      while (pos < tokens.size() && tokens[pos].get_type() == lexer::TokenType::word)
+      {
+        scmd.insert(tokens[pos].get_content());
+        ++pos;
+      }
+      cmd.insert(std::make_shared<cmd::SimpleCmd>(scmd));
+    };
+    add_scmd();
+    while (pos < tokens.size() && tokens[pos].get_type() == lexer::TokenType::pipe)
+      add_scmd();
+    
+    auto io_modify = [&cmd, this]()
+    {
+      while (pos < tokens.size())
+      {
+        switch (tokens[pos].get_type())
         {
-          case TokenType::word:
-            state = State::command;
-            tmp.insert(token.get_content());
+          case lexer::TokenType::rt:
+            cmd.set_in(cmd::Redirect{cmd::RedirectType::input, tokens[pos + 1].get_content()});
+            pos += 2;
+            break;
+          case lexer::TokenType::rt_and:
+            cmd.set_in(cmd::Redirect{cmd::RedirectType::appending, tokens[pos + 1].get_content()});
+            pos += 2;
+            break;
+          case lexer::TokenType::background:
+            cmd.set_background();
+            pos++;
             break;
           default:
-            throw error::Error("Syntax Error", "Unexpected token.", mark_error_from_token(token));
-            break;
+            return;
         }
-        break;
-      case State::command:
-        switch (token.get_type())
-        {
-          case TokenType::word:
-            tmp.insert(token.get_content());
-            break;
-          case TokenType::pipe:
-            command.insert(tmp);
-            tmp.clear();
-            tmp.insert(token.get_content());
-            break;
-          case TokenType::output:
-            command.set_out({cmd::RedirectType::output, token.get_content()});
-            break;
-          case TokenType::appending:
-            command.set_out({cmd::RedirectType::appending, token.get_content()});
-            break;
-          case TokenType::input:
-            command.set_in({cmd::RedirectType::input, token.get_content()});
-            break;
-          case TokenType::background:
-            command.set_background();
-            break;
-          default:
-            throw error::Error("Syntax Error", "Unexpected token.", mark_error_from_token(token));
-            break;
-        }
-        break;
-      default:
-        break;
-    }
-  }
-  
-  std::string Parser::mark_error_from_token(const Token &token) const
-  {
-    std::size_t size = token.get_size();
-    std::size_t errpos = token.get_pos();
-    std::string marked = text;
-    marked += "\n";
-    if (errpos >= size)
-    {
-      marked += std::string(errpos - size + 1, ' ');
-    }
-    marked += "\033[0;32;32m";
-    marked += std::string(size, '^');
-    marked += "\033[m\n";
-    return marked;
+      }
+    };
+    io_modify();
   }
   
 }

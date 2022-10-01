@@ -20,19 +20,18 @@
 #include <functional>
 #include <map>
 
-namespace dish { class Dish; }
 namespace dish::builtin
 {
   using Args = const std::vector<std::string> &;
-  using Func = std::function<int(Dish *, Args)>;
+  using Func = std::function<int(DishInfo *, Args)>;
   
-  int builtin_cd(Dish *, Args args);
+  int builtin_cd(DishInfo *, Args args);
   
-  int builtin_exit(Dish *, Args);
+  int builtin_exit(DishInfo *, Args);
   
-  int builtin_history(Dish *dish, Args args);
+  int builtin_history(DishInfo *dish, Args args);
   
-  int builtin_help(Dish *dish, Args args);
+  int builtin_help(DishInfo *dish, Args args);
   
   static const std::map<std::string, Func> builtins
       {

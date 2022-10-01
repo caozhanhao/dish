@@ -19,11 +19,25 @@
 
 namespace dish
 {
+  class Dish;
+  
+  struct DishInfo
+  {
+    Dish *dish;
+    bool background;
+    int last_ret;
+    
+    DishInfo(Dish *d);
+  };
+  
   class Dish
   {
   private:
     std::vector<std::string> history;
+    DishInfo info;
   public:
+    Dish();
+    
     void run(const std::string &cmd);
     
     void loop();

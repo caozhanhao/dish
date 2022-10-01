@@ -18,6 +18,7 @@
 #include "builtin.h"
 #include <string>
 #include <variant>
+#include <memory>
 
 namespace dish { class Dish; }
 namespace dish::cmd
@@ -45,41 +46,103 @@ namespace dish::cmd
     int get(int mode) const;
   };
   
-  class SingleCommand
+  class Command;
+  
+  class SingleCmd
+  {
+  protected:
+    DishInfo *info;
+  public:
+    virtual int execute() = 0;
+    
+    void set_info(DishInfo *dish_);
+  };
+  
+  class SimpleCmd : public SingleCmd
   {
   private:
     std::vector<std::string> args;
   public:
-    SingleCommand() = default;
+    SimpleCmd() = default;
+    
+    int execute() override;
     
     void insert(std::string str);
     
+    void clear();
+    
+    bool empty() const;
+  
+  private:
     void expand_wildcards();
     
     const std::vector<std::string> &get_args() const;
     
     std::vector<char *> get_cargs() const;
-    
-    void clear();
-    
-    bool empty() const;
   };
+  
+  class ForCmd : public SingleCmd
+  {
+  
+  };
+  
+  class CaseCmd : public SingleCmd
+  {
+  
+  };
+  
+  class WhileCmd : public SingleCmd
+  {
+  private:
+    std::shared_ptr<Command> condition;
+    std::shared_ptr<Command> action;
+  public:
+    int execute() override;
+  };
+  
+  class IfCmd : public SingleCmd
+  {
+  private:
+    std::shared_ptr<Command> condition;
+    std::shared_ptr<Command> true_case;
+    std::shared_ptr<Command> false_case;
+  public:
+    IfCmd(std::shared_ptr<Command> cond, std::shared_ptr<Command> true_c, std::shared_ptr<Command> false_c)
+        : condition(cond), true_case(true_c), false_case(false_c) {}
+    
+    int execute() override;
+  };
+  
+  class Connection : public SingleCmd
+  {
+  
+  };
+  
+  class FuncDef : public SingleCmd
+  {
+  
+  };
+  
+  class GroupDef : public SingleCmd
+  {
+  };
+  
   
   class Command
   {
   private:
-    std::vector<SingleCommand> commands;
+    std::vector<std::shared_ptr<SingleCmd>> commands;
     Redirect out;
     Redirect in;
     Redirect err;
     bool background;
-    Dish *dish;
+    DishInfo *info;
   public:
-    Command();
+    Command(DishInfo *info_);
     
-    void execute();
+    int execute();
     
-    void insert(const SingleCommand &scmd);
+    void insert(std::shared_ptr<SingleCmd> scmd);
     
     void set_in(Redirect redirect);
     
@@ -87,9 +150,10 @@ namespace dish::cmd
     
     void set_err(Redirect redirect);
     
-    void set_dish(Dish *dish_);
+    void set_info(DishInfo *dish_);
     
     void set_background();
   };
+  
 }
 #endif

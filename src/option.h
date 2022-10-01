@@ -116,7 +116,7 @@ namespace dish::option
       {
         throw error::DishError(DISH_ERROR_LOCATION, __func__, "Option has not parsed.");
       }
-      for (auto &r: tasks)
+      for (auto &r:tasks)
       {
         r();
       }
@@ -133,13 +133,11 @@ namespace dish::option
           if (argv[i][1] == '-' && strlen(argv[i]) != 2)
           {
             tokens.emplace_back(Token(std::string(std::string(argv[i]), 2)));//--x
-          }
-          else
+          } else
           {
             tokens.emplace_back(Token(std::string(std::string(argv[i]), 1)));
           }//-x
-        }
-        else
+        } else
         {
           tokens.back().add(std::string(argv[i]));
         }//-
@@ -147,7 +145,7 @@ namespace dish::option
       funcs.insert(std::make_pair(argv[0], Callback()));
       parse_multi();
       
-      for (auto &r: tokens)
+      for (auto &r:tokens)
       {
         if (funcs.find(r.arg) != funcs.cend())
         {
@@ -180,8 +178,7 @@ namespace dish::option
             if (i < it->values.size())
             {
               it = 1 + tokens.insert(it, Token(std::string(1, it->arg[i]), {it->values[i]}));
-            }
-            else
+            } else
             {
               it = 1 + tokens.insert(it, Token(std::string(1, it->arg[i])));
             }
@@ -197,7 +194,7 @@ namespace dish::option
       {
         return false;
       }
-      for (auto &r: str)
+      for (auto &r:str)
       {
         if (funcs.find(std::string(1, r)) == funcs.cend() && alias.find(std::string(1, r)) == alias.cend())
         {

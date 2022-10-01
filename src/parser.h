@@ -15,66 +15,34 @@
 #define DISH_PARSER_H
 
 #include "error.h"
+#include "lexer.h"
 #include "command.h"
 #include <string>
 #include <vector>
 
 namespace dish::parser
 {
-  enum class TokenType
-  {
-    output, input, appending, newline, word, pipe,
-    great_ampersand, great2_ampersand, background
-  };
-  enum class State
-  {
-    init, command
-  };
-  
-  class Token
-  {
-  private:
-    TokenType type;
-    std::string content;
-    std::size_t pos;
-    std::size_t size;
-  public:
-    Token(TokenType type_, std::string content_, std::size_t pos_, std::size_t size_)
-        : type(type_), content(std::move(content_)), pos(pos_), size(size_) {}
-    
-    TokenType get_type() const;
-    
-    std::string get_content() const;
-    
-    std::size_t get_pos() const;
-    
-    std::size_t get_size() const;
-    
-    void set_content(std::string c);
-  };
-  
   class Parser
   {
   private:
-    std::string text;
     cmd::Command command;
-    cmd::SingleCommand tmp;
-    State state;
+    std::shared_ptr<cmd::SingleCmd> scmd;
+    DishInfo *info;
+    std::vector<lexer::Token> tokens;
     std::size_t pos;
-    Dish *dish;
   public:
-    Parser(Dish *dish_, std::string cmd);
+    Parser(DishInfo *info_, std::vector<lexer::Token> tokens);
     
     void parse();
     
     cmd::Command get_cmd() const;
   
   private:
-    std::vector<Token> get_tokens() const;
+    void get_tokens();
     
-    void parse_token(const Token &token);
+    void parse_if();
     
-    std::string mark_error_from_token(const Token &token) const;
+    void parse_cmd(cmd::Command &);
   };
 }
 #endif

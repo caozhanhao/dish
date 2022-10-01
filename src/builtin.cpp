@@ -21,16 +21,14 @@
 #include <functional>
 #include <unistd.h>
 
-namespace dish { class Dish; }
 namespace dish::builtin
 {
-  int builtin_cd(Dish *, Args args)
+  int builtin_cd(DishInfo *, Args args)
   {
     if (args.size() > 2)
     {
       throw error::Error("Program Error", "cd: Unexpected arguments.", utils::mark_error(args, 2));
-    }
-    else if (args.size() == 1)
+    } else if (args.size() == 1)
     {
       auto home = utils::get_home();
       if (home.empty())
@@ -41,8 +39,7 @@ namespace dish::builtin
       {
         throw error::Error("Program Error", std::string("cd: ") + strerror(errno), utils::mark_error(args, 0));
       }
-    }
-    else
+    } else
     {
       std::string arg;
       if (args[1][0] == '~')
@@ -54,8 +51,7 @@ namespace dish::builtin
         }
         if (arg.back() == '/') arg.pop_back();
         arg += args[1].substr(1);
-      }
-      else
+      } else
       {
         arg = args[1];
       }
@@ -67,15 +63,15 @@ namespace dish::builtin
     return 1;
   }
   
-  int builtin_exit(Dish *, Args)
+  int builtin_exit(DishInfo *, Args)
   {
     std::exit(0);
   }
   
-  int builtin_history(Dish *dish, Args args)
+  int builtin_history(DishInfo *dish, Args args)
   {
     int index = 1;
-    for (auto &r: dish->get_history())
+    for (auto &r:dish->dish->get_history())
     {
       utils::print("%d| %s\n", index, r.c_str());
       index++;
@@ -83,10 +79,10 @@ namespace dish::builtin
     return 1;
   }
   
-  int builtin_help(Dish *dish, Args args)
+  int builtin_help(DishInfo *dish, Args args)
   {
     std::string list;
-    for (auto &r: builtins)
+    for (auto &r:builtins)
     {
       list += utils::colorify(r.first, utils::Color::LIGHT_BLUE);
       list += ", ";

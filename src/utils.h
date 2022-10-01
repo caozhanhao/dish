@@ -40,13 +40,13 @@ namespace dish::utils
   
   static std::string colorify(const std::string &str, Color type)
   {
-    return "\033[" + std::to_string(static_cast<std::size_t>(type)) + "m" + str + "\033[0m";
+    return "\033[1;" + std::to_string(static_cast<std::size_t>(type)) + "m" + str + "\033[0m";
   }
   
   static std::string mark_error(const std::vector<std::string> &args, int errpos = -1)
   {
     std::string marked;
-    for (auto &r: args)
+    for (auto &r:args)
     {
       marked += r;
       marked += " ";
@@ -118,8 +118,7 @@ namespace dish::utils
           {
             ret.emplace_back(ent->d_name);
           }
-        }
-        else
+        } else
         {
           ret.emplace_back(ent->d_name);
         }
@@ -145,7 +144,7 @@ namespace dish::utils
     std::string home = get_home();
     if (home.empty()) return path;
     if (home.back() == '/') home.pop_back();
-    auto[it1, it2] = std::mismatch(path.cbegin(), path.cend(), home.cbegin(), home.cend());
+    auto [it1, it2] = std::mismatch(path.cbegin(), path.cend(), home.cbegin(), home.cend());
     if (it2 == home.cend())
     {
       return "~" + path.substr(home.size());
