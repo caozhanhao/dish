@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,12 +11,15 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_LEXER_H
-#define DISH_LEXER_H
+#ifndef DISH_LEXER_HPP
+#define DISH_LEXER_HPP
+#pragma once
 
-#include "error.h"
-#include "command.h"
+#include "error.hpp"
+#include "command.hpp"
+
 #include <string>
+#include <optional>
 #include <vector>
 
 namespace dish::lexer
@@ -25,23 +28,12 @@ namespace dish::lexer
   {
     word, lt, rt, newline, pipe,
     rt_and, rt_rt, rt_rt_and, background,
-    if_tok, else_tok, then_tok, fi_tok
+    end
   };
   enum class CmdState
   {
-    init, word, io_modifier, filename, background
+    init, word, io_modifier, pipe,  filename, background, end
   };
-  enum class IfState
-  {
-    init, if_state, then_state, else_state, fi_state
-  };
-  static const std::map<std::string, TokenType> ids
-      {
-          {"if",   TokenType::if_tok},
-          {"else", TokenType::else_tok},
-          {"then", TokenType::then_tok},
-          {"fi",   TokenType::fi_tok}
-      };
   
   class Token
   {
@@ -51,6 +43,7 @@ namespace dish::lexer
     std::size_t pos;
     std::size_t size;
   public:
+    Token() = default;
     Token(TokenType type_, std::string content_, std::size_t pos_, std::size_t size_)
         : type(type_), content(std::move(content_)), pos(pos_), size(size_) {}
     
@@ -71,20 +64,15 @@ namespace dish::lexer
     std::string text;
     std::size_t pos;
     CmdState cmd_state;
-    IfState if_state;
   public:
     Lexer(std::string cmd) : text(cmd), pos(0) {}
-    
-    std::vector<Token> get_all_tokens();
-    
-    cmd::Command get_cmd() const;
   
+    std::optional<std::vector<Token>> get_all_tokens();
+    
   private:
     Token get_token();
     
-    void check_cmd(const Token &token);
-    
-    void check_if(const Token &token);
+    int check_cmd(const Token &token);
     
     std::string mark_error_from_token(const Token &token) const;
   };

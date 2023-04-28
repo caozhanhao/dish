@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,11 +11,13 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#include "error.h"
-#include "parser.h"
-#include "lexer.h"
-#include "command.h"
-#include "utils.h"
+
+#include "dish/error.hpp"
+#include "dish/parser.hpp"
+#include "dish/lexer.hpp"
+#include "dish/command.hpp"
+#include "dish/utils.hpp"
+
 #include <iostream>
 #include <unistd.h>
 #include <pwd.h>
@@ -29,24 +31,15 @@ namespace dish
   void Dish::run(const std::string &cmd)
   {
     history.emplace_back(cmd);
-    try
-    {
-      lexer::Lexer lexer{cmd};
-      parser::Parser parser{&info, lexer.get_all_tokens()};
-      parser.parse();
-      parser.get_cmd().execute();
-    }
-    catch (error::Error &err)
-    {
-      utils::print(err.get_content().c_str());
-    }
-    catch (error::DishError &err)
-    {
-      utils::print(err.get_content().c_str());
-    }
+    lexer::Lexer lexer{cmd};
+    auto tokens = lexer.get_all_tokens();
+    if(!tokens.has_value()) return;
+    parser::Parser parser{&info, tokens.value()};
+    parser.parse();
+    parser.get_cmd().execute();
   }
   
-  void Dish::loop()
+  [[noreturn]] void Dish::loop()
   {
     while (true)
     {
@@ -57,15 +50,12 @@ namespace dish
       char cwd[256];
       getcwd(cwd, sizeof(cwd));
       auto uid = getuid();
-      auto s = utils::colorify(getpwuid(uid)->pw_name, utils::Color::LIGHT_BLUE);
-      utils::print("%s Dish %s @ %s in %s %s \n%s",
-                   utils::colorify("#", utils::Color::LIGHT_BLUE).c_str(),
-                   utils::colorify(getpwuid(uid)->pw_name, utils::Color::LIGHT_BLUE).c_str(),
-                   utils::colorify(hostname, utils::Color::GREEN).c_str(),
-                   utils::colorify(utils::simplify_path(cwd), utils::Color::YELLOW).c_str(),
-                   utils::colorify("ret: " + std::to_string(info.last_ret), utils::Color::RED).c_str(),
-                   utils::colorify(uid == 0 ? "#" : "$", utils::Color::RED).c_str()
-      );
+      fmt::print("> Dish {}@{}:{} {} \n{} ",
+                   utils::blue(getpwuid(uid)->pw_name),
+                   utils::green(hostname),
+                   utils::yellow(utils::simplify_path(cwd)),
+                   info.last_ret == 0 ? "" : utils::red("C: " + std::to_string(info.last_ret)),
+                   utils::red(uid == 0 ? "#" : "$"));
       std::getline(std::cin, cmd);
       if (!cmd.empty())
       {

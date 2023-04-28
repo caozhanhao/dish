@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,10 +11,12 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_BUILTIN_H
-#define DISH_BUILTIN_H
+#ifndef DISH_BUILTIN_HPP
+#define DISH_BUILTIN_HPP
+#pragma once
 
-#include "dish.h"
+#include "dish.hpp"
+
 #include <vector>
 #include <string>
 #include <functional>
@@ -27,6 +29,8 @@ namespace dish::builtin
   
   int builtin_cd(DishInfo *, Args args);
   
+  int builtin_pwd(DishInfo *, Args args);
+  
   int builtin_exit(DishInfo *, Args);
   
   int builtin_history(DishInfo *dish, Args args);
@@ -36,6 +40,7 @@ namespace dish::builtin
   static const std::map<std::string, Func> builtins
       {
           {"cd",      builtin_cd},
+          {"pwd",      builtin_pwd},
           {"exit",    builtin_exit},
           {"history", builtin_history},
           {"help",    builtin_help}

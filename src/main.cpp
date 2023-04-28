@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,8 +11,9 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#include "dish.h"
-#include "option.h"
+
+#include "dish/dish.hpp"
+#include "dish/option.hpp"
 
 using namespace dish;
 
@@ -22,7 +23,7 @@ int main(int argc, char **argv)
   option::Option option(argc, argv);
   option.add("dish", [&dish](option::Option::CallbackArgType args)
   {
-    for (auto &cmd:args)
+    for (auto &cmd : args)
     {
       dish.run(cmd);
     }

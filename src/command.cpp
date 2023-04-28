@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,18 +11,22 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#include "utils.h"
-#include "builtin.h"
-#include "command.h"
+
+#include "dish/utils.hpp"
+#include "dish/builtin.hpp"
+#include "dish/command.hpp"
+
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
 #include <string>
 #include <variant>
 #include <algorithm>
 #include <vector>
+#include <list>
 #include <cstdlib>
 #include <cstring>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <fcntl.h>
 
 namespace dish::cmd
 {
@@ -38,7 +42,8 @@ namespace dish::cmd
     if (is_description())
     {
       return get_description();
-    } else
+    }
+    else
     {
       return open(get_filename().c_str(), mode);
     }
@@ -56,7 +61,9 @@ namespace dish::cmd
     int ret = 0;
     expand_wildcards();
     if (builtin::builtins.find(args[0]) != builtin::builtins.end())
-      builtin::builtins.at(args[0])(info, args);
+    {
+      ret = builtin::builtins.at(args[0])(info, args);
+    }
     else
     {
       int childpid = fork();
@@ -66,7 +73,7 @@ namespace dish::cmd
         cargs.emplace_back(static_cast<char *>(nullptr));
         if (execvp(cargs[0], cargs.data()) == -1)
         {
-          throw error::DishError(DISH_ERROR_LOCATION, __func__, std::string("execvp :") + strerror(errno));
+          fmt::println("execvp: {}",  strerror(errno));
         }
         std::exit(1);
       } else
@@ -113,14 +120,6 @@ namespace dish::cmd
     return vc;
   }
   
-  //IfCmd
-  int IfCmd::execute()
-  {
-    if (condition->execute() == 0)
-      return true_case->execute();
-    return false_case->execute();
-  }
-  
   //Command
   Command::Command(DishInfo *info_)
       : out(RedirectType::output, 0), in(RedirectType::input, 1),
@@ -131,12 +130,24 @@ namespace dish::cmd
     int tmpin = dup(0);
     int tmpout = dup(1);
     int fdin = 0;
+    int fdout = 0;
     if (!in.is_description() || in.get_description() != 1)
     {
       fdin = in.get(O_RDONLY);
-    } else
+      if(fdin == -1)
+      {
+        fmt::println("open: {}", strerror(errno));
+        return -1;
+      }
+    }
+    else
     {
       fdin = dup(tmpin);
+      if(fdin == -1)
+      {
+        fmt::println("dup: {}", strerror(errno));
+        return -1;
+      }
     }
     
     int ret = 0;
@@ -145,36 +156,75 @@ namespace dish::cmd
       auto &scmd = *it;
       dup2(fdin, 0);
       close(fdin);
-      int fdout = 0;
       if (it + 1 == commands.cend())
       {
         if (!out.is_description() || out.get_description() != 0)
         {
           fdout = out.get(O_WRONLY);
-        } else
+          if(fdout == -1)
+          {
+            fmt::println("open: {}", strerror(errno));
+            return -1;
+          }
+        }
+        else
         {
           fdout = dup(tmpout);
+          if(fdout == -1)
+          {
+            fmt::println("dup: {}", strerror(errno));
+            return -1;
+          }
         }
-      } else
+      }
+      else
       {
         int fdpipe[2];
-        pipe(fdpipe);
+        if (pipe(fdpipe) == -1)
+        {
+          fmt::println("pipe: {}", strerror(errno));
+          return -1;
+        }
         fdout = fdpipe[1];
         fdin = fdpipe[0];
       }
-      
+    
       info->background = background;
       ret = scmd->execute();
-      
-      dup2(fdout, 1);
-      close(fdout);
+    
+      if(dup2(fdout, 1) == -1)
+      {
+        fmt::println("dup2: {}", strerror(errno));
+        return -1;
+      }
+      if(close(fdout) == -1)
+      {
+        fmt::println("close: {}", strerror(errno));
+        return -1;
+      }
     }
-    
-    dup2(tmpin, 0);
-    dup2(tmpout, 1);
-    
-    close(tmpin);
-    close(tmpout);
+  
+    if(dup2(tmpin, 0) == -1)
+    {
+      fmt::println("dup2: {}", strerror(errno));
+      return -1;
+    }
+    if(dup2(tmpout, 1) == -1)
+    {
+      fmt::println("dup2: {}", strerror(errno));
+      return -1;
+    }
+  
+    if(close(tmpin) == -1)
+    {
+      fmt::println("close: {}", strerror(errno));
+      return -1;
+    }
+    if(close(tmpout) == -1)
+    {
+      fmt::println("close: {}", strerror(errno));
+      return -1;
+    }
     return ret;
   }
   

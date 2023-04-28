@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,12 +11,16 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_COMMAND_H
-#define DISH_COMMAND_H
+#ifndef DISH_COMMAND_HPP
+#define DISH_COMMAND_HPP
+#pragma once
 
-#include "error.h"
-#include "builtin.h"
+#include "error.hpp"
+#include "builtin.hpp"
+
 #include <string>
+#include <list>
+#include <vector>
 #include <variant>
 #include <memory>
 
@@ -42,7 +46,7 @@ namespace dish::cmd
     std::string get_filename() const;
     
     int get_description() const;
-    
+  
     int get(int mode) const;
   };
   
@@ -80,53 +84,6 @@ namespace dish::cmd
     
     std::vector<char *> get_cargs() const;
   };
-  
-  class ForCmd : public SingleCmd
-  {
-  
-  };
-  
-  class CaseCmd : public SingleCmd
-  {
-  
-  };
-  
-  class WhileCmd : public SingleCmd
-  {
-  private:
-    std::shared_ptr<Command> condition;
-    std::shared_ptr<Command> action;
-  public:
-    int execute() override;
-  };
-  
-  class IfCmd : public SingleCmd
-  {
-  private:
-    std::shared_ptr<Command> condition;
-    std::shared_ptr<Command> true_case;
-    std::shared_ptr<Command> false_case;
-  public:
-    IfCmd(std::shared_ptr<Command> cond, std::shared_ptr<Command> true_c, std::shared_ptr<Command> false_c)
-        : condition(cond), true_case(true_c), false_case(false_c) {}
-    
-    int execute() override;
-  };
-  
-  class Connection : public SingleCmd
-  {
-  
-  };
-  
-  class FuncDef : public SingleCmd
-  {
-  
-  };
-  
-  class GroupDef : public SingleCmd
-  {
-  };
-  
   
   class Command
   {

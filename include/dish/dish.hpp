@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,38 +11,43 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_PARSER_H
-#define DISH_PARSER_H
+#ifndef DISH_DISH_HPP
+#define DISH_DISH_HPP
+#pragma once
 
-#include "error.h"
-#include "lexer.h"
-#include "command.h"
+#include "value.hpp"
+
 #include <string>
+#include <map>
 #include <vector>
 
-namespace dish::parser
+namespace dish
 {
-  class Parser
+  class Dish;
+  
+  struct DishInfo
+  {
+    Dish *dish;
+    std::map<std::string, value::Value> var_table;
+    bool background;
+    int last_ret;
+    
+    DishInfo(Dish *d);
+  };
+  
+  class Dish
   {
   private:
-    cmd::Command command;
-    std::shared_ptr<cmd::SingleCmd> scmd;
-    DishInfo *info;
-    std::vector<lexer::Token> tokens;
-    std::size_t pos;
+    std::vector<std::string> history;
+    DishInfo info;
   public:
-    Parser(DishInfo *info_, std::vector<lexer::Token> tokens);
+    Dish();
     
-    void parse();
-    
-    cmd::Command get_cmd() const;
+    void run(const std::string &cmd);
   
-  private:
-    void get_tokens();
+    [[noreturn]] void loop();
     
-    void parse_if();
-    
-    void parse_cmd(cmd::Command &);
+    std::vector<std::string> get_history() const;
   };
 }
 #endif

@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,10 +11,12 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#include "utils.h"
-#include "error.h"
-#include "dish.h"
-#include "builtin.h"
+
+#include "dish/utils.hpp"
+#include "dish/error.hpp"
+#include "dish/dish.hpp"
+#include "dish/builtin.hpp"
+
 #include <map>
 #include <vector>
 #include <string>
@@ -27,17 +29,21 @@ namespace dish::builtin
   {
     if (args.size() > 2)
     {
-      throw error::Error("Program Error", "cd: Unexpected arguments.", utils::mark_error(args, 2));
-    } else if (args.size() == 1)
+      fmt::println("cd: too many arguments.");
+      return -1;
+    }
+    else if (args.size() == 1)
     {
       auto home = utils::get_home();
       if (home.empty())
       {
-        throw error::Error("Program Error", "cd: Can not find ~", utils::mark_error(args, 0));
+        fmt::println("cd: Can not find ~");
+        return -1;
       }
       if (chdir(home.c_str()) != 0)
       {
-        throw error::Error("Program Error", std::string("cd: ") + strerror(errno), utils::mark_error(args, 0));
+        fmt::println("cd: {}", strerror(errno));
+        return -1;
       }
     } else
     {
@@ -47,7 +53,8 @@ namespace dish::builtin
         arg = utils::get_home();
         if (arg.empty())
         {
-          throw error::Error("Program Error", "cd: Can not find ~", utils::mark_error(args, 0));
+          fmt::println("cd: Can not find ~");
+          return -1;
         }
         if (arg.back() == '/') arg.pop_back();
         arg += args[1].substr(1);
@@ -57,8 +64,22 @@ namespace dish::builtin
       }
       if (chdir(arg.c_str()) != 0)
       {
-        throw error::Error("Program Error", std::string("cd: ") + strerror(errno), utils::mark_error(args, 1));
+        fmt::println("cd: {}", strerror(errno));
+        return -1;
       }
+    }
+    return 1;
+  }
+  int builtin_pwd(DishInfo *, Args args)
+  {
+    if (args.size() != 0)
+    {
+      fmt::println("cd: too many arguments.");
+      return -1;
+    }
+    else
+    {
+    
     }
     return 1;
   }
@@ -73,7 +94,7 @@ namespace dish::builtin
     int index = 1;
     for (auto &r:dish->dish->get_history())
     {
-      utils::print("%d| %s\n", index, r.c_str());
+      fmt::println("{}| {}", index, r);
       index++;
     }
     return 1;
@@ -81,21 +102,14 @@ namespace dish::builtin
   
   int builtin_help(DishInfo *dish, Args args)
   {
-    std::string list;
+    std::vector<std::string> list;
     for (auto &r:builtins)
-    {
-      list += utils::colorify(r.first, utils::Color::LIGHT_BLUE);
-      list += ", ";
-    }
-    if (!list.empty())
-    {
-      list.pop_back();
-      list.pop_back();
-      list += "\n";
-    }
-    utils::print("Dish - caozhanhao, version 0.0.1-beta\n"
-                 "These are builtin-commands. Use 'help' to see this.\n"
-                 + list
+      list.emplace_back(utils::light_blue(r.first));
+    
+    fmt::println("{} \n {} \n {}",
+        "Dish - caozhanhao, version 0.0.1-beta.",
+        "These are builtin-commands. Use 'help' to see this.",
+        fmt::join(list, ", ")
     );
     return 1;
   }

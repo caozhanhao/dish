@@ -1,4 +1,4 @@
-//   Copyright 2022 dish - caozhanhao
+//   Copyright 2022 - 2023 dish - caozhanhao
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -11,27 +11,27 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_UTILS_H
-#define DISH_UTILS_H
+#ifndef DISH_UTILS_HPP
+#define DISH_UTILS_HPP
+#pragma once
 
-#include "error.h"
+#include "error.hpp"
+
+#define FMT_HEADER_ONLY
+#include "bundled/fmt/core.h"
+
+#include <sys/types.h>
+#include <dirent.h>
+
 #include <vector>
 #include <algorithm>
 #include <string>
 #include <regex>
 #include <cstdio>
 #include <cstring>
-#include <sys/types.h>
-#include <dirent.h>
 
 namespace dish::utils
 {
-  template<typename ...Args>
-  static int print(std::string fmt, Args &&...args)
-  {
-    return printf(fmt.c_str(), args...);
-  }
-  
   enum class Color : std::size_t
   {
     RED = 31, GREEN, YELLOW, BLUE, PURPLE, LIGHT_BLUE,
@@ -43,30 +43,33 @@ namespace dish::utils
     return "\033[1;" + std::to_string(static_cast<std::size_t>(type)) + "m" + str + "\033[0m";
   }
   
-  static std::string mark_error(const std::vector<std::string> &args, int errpos = -1)
+  static std::string red(const std::string &str)
   {
-    std::string marked;
-    for (auto &r:args)
-    {
-      marked += r;
-      marked += " ";
-    }
-    if (!marked.empty())
-    {
-      marked.pop_back();
-    }
-    if (errpos != -1 || errpos >= args.size())
-    {
-      marked += "\n";
-      for (std::size_t i = 0; i < errpos; ++i)
-      {
-        marked += std::string(args[i].size(), ' ');
-        marked += " ";
-      }
-      marked += colorify(std::string(args[errpos].size(), '^'), Color::GREEN);
-    }
-    marked += '\n';
-    return marked;
+    return colorify(str, Color::RED);
+  }
+  static std::string green(const std::string &str)
+  {
+    return colorify(str, Color::GREEN);
+  }
+  static std::string yellow(const std::string &str)
+  {
+    return colorify(str, Color::YELLOW);
+  }
+  static std::string blue(const std::string &str)
+  {
+    return colorify(str, Color::BLUE);
+  }
+  static std::string purple(const std::string &str)
+  {
+    return colorify(str, Color::PURPLE);
+  }
+  static std::string light_blue(const std::string &str)
+  {
+    return colorify(str, Color::BLUE);
+  }
+  static std::string white(const std::string &str)
+  {
+    return colorify(str, Color::WHITE);
   }
   
   static bool has_wildcards(const std::string &s)
