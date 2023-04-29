@@ -14,7 +14,7 @@
 
 #include "dish/utils.hpp"
 #include "dish/lexer.hpp"
-#include "dish/command.hpp"
+#include "dish/job.hpp"
 #include "dish/parser.hpp"
 
 #include <string>
@@ -22,9 +22,8 @@
 
 namespace dish::parser
 {
-  
-  Parser::Parser(DishInfo *info_, std::vector<lexer::Token> tokens_)
-      : info(info_), scmd(nullptr), command(info_), tokens(tokens_), pos(0) {}
+  Parser::Parser(const std::string& cmd, std::vector<lexer::Token> tokens_)
+      : command(cmd), tokens(tokens_), pos(0) {}
   
   int Parser::parse()
   {
@@ -37,20 +36,20 @@ namespace dish::parser
     return 0;
   }
   
-  cmd::Command Parser::get_cmd() const { return command; }
+  job::Job Parser::get_cmd() const { return command; }
   
-  int Parser::parse_cmd(cmd::Command &cmd)
+  int Parser::parse_cmd(job::Job &cmd)
   {
     auto add_scmd = [&cmd, this]()
     {
-      cmd::SimpleCmd scmd;
+      job::Process scmd;
       while (pos < tokens.size() &&
       (tokens[pos].get_type() == lexer::TokenType::word || tokens[pos].get_type() == lexer::TokenType::env_var))
       {
         auto content = tokens[pos++].get_content();
-        if (tokens[pos - 1].get_type() == lexer::TokenType::word && utils::has_wildcards(content))
+        if (tokens[pos - 1].get_type() == lexer::TokenType::word)
         {
-          auto expanded = utils::expand_wildcards(content);
+          auto expanded = utils::expand(content);
           if(!expanded.has_value())
             return -1;
           for(auto& r : expanded.value())
@@ -61,7 +60,7 @@ namespace dish::parser
           auto env = utils::expand_env_var(content);
           if(!env.has_value())
           {
-            fmt::println("Unknown environment variable.");
+            fmt::println("Unknown environment variable: {}", content);
             return -1;
           }
           scmd.insert(env.value());
@@ -69,7 +68,7 @@ namespace dish::parser
         else
           scmd.insert(content);
       }
-      cmd.insert(std::make_shared<cmd::SimpleCmd>(scmd));
+      cmd.insert(scmd);
       return 0;
     };
     if(add_scmd() == -1) return -1;
@@ -84,11 +83,11 @@ namespace dish::parser
       switch (tokens[pos].get_type())
       {
         case lexer::TokenType::lt://<
-          cmd.set_in(cmd::Redirect{cmd::RedirectType::input, tokens[pos + 1].get_content()});
+          cmd.set_in(job::Redirect{job::RedirectType::input, tokens[pos + 1].get_content()});
           pos += 2;
           break;
         case lexer::TokenType::rt://>
-          cmd.set_out(cmd::Redirect{cmd::RedirectType::overwrite, tokens[pos + 1].get_content()});
+          cmd.set_out(job::Redirect{job::RedirectType::overwrite, tokens[pos + 1].get_content()});
           pos += 2;
           break;
         case lexer::TokenType::lt_lt://<<
@@ -100,15 +99,15 @@ namespace dish::parser
           pos += 2;
           break;
         case lexer::TokenType::rt_rt://>>
-          cmd.set_out(cmd::Redirect{cmd::RedirectType::append, tokens[pos + 1].get_content()});
+          cmd.set_out(job::Redirect{job::RedirectType::append, tokens[pos + 1].get_content()});
           pos += 2;
           break;
         case lexer::TokenType::lt_and://<&
-          cmd.set_in(cmd::Redirect{cmd::RedirectType::fd, std::stoi(tokens[pos + 1].get_content())});
+          cmd.set_in(job::Redirect{job::RedirectType::fd, std::stoi(tokens[pos + 1].get_content())});
           pos += 2;
           break;
         case lexer::TokenType::rt_and://>&
-          cmd.set_out(cmd::Redirect{cmd::RedirectType::fd, std::stoi(tokens[pos + 1].get_content())});
+          cmd.set_out(job::Redirect{job::RedirectType::fd, std::stoi(tokens[pos + 1].get_content())});
           pos += 2;
           break;
         case lexer::TokenType::lt_rt://<>

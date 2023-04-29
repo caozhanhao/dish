@@ -12,27 +12,36 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
+#include "dish/job.hpp"
 #include "dish/utils.hpp"
-#include "dish/error.hpp"
 #include "dish/dish.hpp"
 #include "dish/builtin.hpp"
 
-#include <map>
 #include <vector>
 #include <string>
-#include <functional>
 #include <unistd.h>
 
 namespace dish::builtin
 {
-  int builtin_cd(DishInfo *, Args args)
+  int builtin_cd(Args args)
   {
     if (args.size() > 2)
     {
       fmt::println("cd: too many arguments.");
       return -1;
     }
-    else if (args.size() == 1)
+    else if(args.size() < 1)
+    {
+      fmt::println("cd: too few arguments.");
+      return -1;
+    }
+  
+    auto last_dir_opt = utils::get_working_directory();
+    std::string last_dir = "/";
+    if(last_dir_opt.has_value())
+      last_dir = last_dir_opt.value();
+    
+    if (args.size() == 1)
     {
       auto home_opt = utils::get_home();
       if (!home_opt.has_value())
@@ -45,33 +54,32 @@ namespace dish::builtin
         fmt::println("cd: {}", strerror(errno));
         return -1;
       }
-    } else
+    }
+    else if(args[1] == "-")
     {
-      std::string arg;
-      if (args[1][0] == '~')
+      if(!dish_context.last_dir.empty())
       {
-        auto home_opt = utils::get_home();
-        if (!home_opt.has_value())
+        if (chdir(dish_context.last_dir.c_str()) != 0)
         {
-          fmt::println("cd: Can not find ~");
+          fmt::println("cd: {}", strerror(errno));
           return -1;
         }
-        arg = home_opt.value();
-        if (arg.back() == '/') arg.pop_back();
-        arg += args[1].substr(1);
-      } else
-      {
-        arg = args[1];
       }
-      if (chdir(arg.c_str()) != 0)
+      else
       {
-        fmt::println("cd: {}", strerror(errno));
+        fmt::println("cd: Invalid '-'.");
         return -1;
       }
     }
+    else if (chdir(args[1].c_str()) != 0)
+    {
+      fmt::println("cd: {}", strerror(errno));
+      return -1;
+    }
+    dish_context.last_dir = last_dir;
     return 1;
   }
-  int builtin_pwd(DishInfo *, Args args)
+  int builtin_pwd(Args args)
   {
     if (args.size() != 1)
     {
@@ -91,20 +99,39 @@ namespace dish::builtin
     return 1;
   }
   
-  int builtin_export(DishInfo *, Args)
+  int builtin_export(Args)
   {
-  
+  }
+  int builtin_jobs(Args)
+  {
+    update_status();
+    for (auto& job : dish_jobs)
+    {
+      if (job->is_completed())
+        job->format_job_info("completed");
+      else if (job->is_stopped())
+        job->format_job_info("stopped");
+      else
+        job->format_job_info("running");
+    }
+    return 1;
+  }
+  int builtin_fg(Args)
+  {
+  }
+  int builtin_bg(Args)
+  {
   }
   
-  int builtin_exit(DishInfo *, Args)
+  int builtin_exit(Args)
   {
-    std::exit(0);
+    return 0;
   }
   
-  int builtin_history(DishInfo *dish, Args args)
+  int builtin_history(Args args)
   {
     int index = 1;
-    for (auto &r:dish->dish->get_history())
+    for (auto &r : dish_history)
     {
       fmt::println("{}| {}", index, r);
       index++;
@@ -112,7 +139,7 @@ namespace dish::builtin
     return 1;
   }
   
-  int builtin_help(DishInfo *dish, Args args)
+  int builtin_help(Args args)
   {
     std::vector<std::string> list;
     for (auto &r:builtins)

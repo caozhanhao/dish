@@ -15,8 +15,6 @@
 #define DISH_UTILS_HPP
 #pragma once
 
-#include "error.hpp"
-
 #define FMT_HEADER_ONLY
 #include "bundled/fmt/core.h"
 
@@ -88,61 +86,6 @@ namespace dish::utils
             s.find('?') != std::string::npos);
   }
   
-  static std::optional<std::vector<std::string>> expand_wildcards(const std::string &s)
-  {
-    std::string pattern{'^'};
-    for (auto it = s.cbegin(); it < s.cend(); ++it)
-    {
-      auto &ch = *it;
-      switch (ch)
-      {
-        case '*':
-          pattern += ".*";
-          break;
-        case '?':
-          pattern += ".?";
-          break;
-        case '.':
-          pattern += "\\.";
-          break;
-        default:
-          pattern += ch;
-          break;
-      }
-    }
-    pattern += '$';
-    
-    DIR *dir = opendir(".");
-    if (dir == NULL)
-    {
-      fmt::println("opendir: {}", strerror(errno));
-      return std::nullopt;
-    }
-    
-    std::regex re(pattern);
-    std::vector<std::string> ret;
-    dirent *ent;
-    while ((ent = readdir(dir)) != NULL)
-    {
-      if (std::regex_match(ent->d_name, re))
-      {
-        if (ent->d_name[0] == '.')
-        {
-          if (s[0] == '.')
-          {
-            ret.emplace_back(ent->d_name);
-          }
-        } else
-        {
-          ret.emplace_back(ent->d_name);
-        }
-      }
-    }
-    closedir(dir);
-    std::sort(ret.begin(), ret.end());
-    return ret;
-  }
-  
   static std::optional<std::string> get_home()
   {
     char const *home = getenv("HOME");
@@ -150,8 +93,94 @@ namespace dish::utils
     if (home == nullptr) home = getenv("HOMEDRIVE");
     if (home == nullptr) home = getenv("HOMEPATH");
     if (home == nullptr) return std::nullopt;
-    return home;
+    std::string home_str = home;
+    if(*home_str.rbegin() == '/') home_str.pop_back();
+    return home_str;
   }
+  
+  static std::optional<std::vector<std::string>> expand(const std::string &str)
+  {
+    std::string s;
+    auto home = get_home();
+    // Tilde(~)
+    if (home.has_value())
+    {
+      for (auto it = str.cbegin(); it < str.cend(); ++it)
+      {
+        if (*it == '~' &&
+            ((it + 1 != str.cend() && it != str.cbegin() && *(it + 1) == '/' && *(it - 1) == '/')
+             || (it + 1 == str.cend() && it != str.cbegin() && *(it - 1) == '/')
+             || (it + 1 != str.cend() && it == str.cbegin() && *(it + 1) == '/')
+             || (it + 1 == str.cend() && it == str.cbegin())
+             ))
+        {
+          s += home.value();
+        }
+        else
+          s += *it;
+      }
+    }
+    else
+      s = str;
+    // Wildcards
+    if(utils::has_wildcards(str))
+    {
+      std::string pattern{'^'};
+      for (auto it = s.cbegin(); it < s.cend(); ++it)
+      {
+        auto &ch = *it;
+        switch (ch)
+        {
+          case '*':
+            pattern += ".*";
+            break;
+          case '?':
+            pattern += ".?";
+            break;
+          case '.':
+            pattern += "\\.";
+            break;
+          default:
+            pattern += ch;
+            break;
+        }
+      }
+      pattern += '$';
+  
+      DIR *dir = opendir(".");
+      if (dir == NULL)
+      {
+        fmt::println("opendir: {}", strerror(errno));
+        return std::nullopt;
+      }
+  
+      std::regex re(pattern);
+      std::vector<std::string> ret;
+      dirent *ent;
+      while ((ent = readdir(dir)) != NULL)
+      {
+        if (std::regex_match(ent->d_name, re))
+        {
+          if (ent->d_name[0] == '.')
+          {
+            if (s[0] == '.')
+            {
+              ret.emplace_back(ent->d_name);
+            }
+          }
+          else
+          {
+            ret.emplace_back(ent->d_name);
+          }
+        }
+      }
+      closedir(dir);
+      std::sort(ret.begin(), ret.end());
+      return ret;
+    }
+    return {{s}};
+  }
+  
   static std::optional<std::string> get_working_directory()
   {
     char buf[1024];
@@ -166,7 +195,6 @@ static std::string simplify_path(const std::string &path)
     auto home_opt = get_home();
     if (!home_opt.has_value()) return path;
     auto home = home_opt.value();
-    if (home.back() == '/') home.pop_back();
     auto [it1, it2] = std::mismatch(path.cbegin(), path.cend(), home.cbegin(), home.cend());
     if (it2 == home.cend())
     {

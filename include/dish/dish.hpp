@@ -15,39 +15,45 @@
 #define DISH_DISH_HPP
 #pragma once
 
-#include "value.hpp"
+#include <sys/types.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include <string>
 #include <map>
 #include <vector>
+#include <memory>
 
 namespace dish
 {
-  class Dish;
-  
-  struct DishInfo
+  struct DishContext
   {
-    Dish *dish;
-    std::map<std::string, value::Value> var_table;
-    bool background;
     int last_ret;
+    std::string last_dir;
     
-    DishInfo(Dish *d);
+    pid_t pgid;
+    struct termios tmodes;
+    int terminal;
+    int is_interactive;
   };
+  namespace job{class Job;}
   
-  class Dish
-  {
-  private:
-    std::vector<std::string> history;
-    DishInfo info;
-  public:
-    Dish();
-    
-    void run(const std::string &cmd);
+  extern std::vector<std::string> dish_history;
+  extern DishContext dish_context;
+  extern std::vector<std::shared_ptr<job::Job>> dish_jobs;
   
-    [[noreturn]] void loop();
-    
-    std::vector<std::string> get_history() const;
-  };
+  extern void init();
+  
+  extern void run(const std::string &cmd);
+  
+  [[noreturn]] extern void loop();
+  
+  extern std::vector<std::string> get_history();
+  
+  extern void do_job_notification(int i);
+  
+  extern int mark_process_status(int pid, int status);
+  
+  extern void update_status();
 }
 #endif

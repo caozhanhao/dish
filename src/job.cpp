@@ -14,7 +14,7 @@
 
 #include "dish/utils.hpp"
 #include "dish/builtin.hpp"
-#include "dish/command.hpp"
+#include "dish/job.hpp"
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -28,7 +28,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace dish::cmd
+namespace dish::job
 {
   //Redirect
   bool Redirect::is_description() const { return redirect.index() == 0; }
@@ -56,26 +56,40 @@ namespace dish::cmd
     }
     return -1;
   }
-  
-  //SingleCmd
-  void SingleCmd::set_info(DishInfo *dish_)
+  void Process::set_job_context(Job *job_)
   {
-    info = dish_;
+    job_context = job_;
   }
   
-  //SimpleCmd
-  std::pair<int, int> SimpleCmd::execute()
+  int Process::launch()
   {
     int ret, childpid = 0;
     if (builtin::builtins.find(args[0]) != builtin::builtins.end())
     {
-      ret = builtin::builtins.at(args[0])(info, args);
+      is_builtin = true;
+      ret = builtin::builtins.at(args[0])(args);
+      completed = true;
     }
     else
     {
       childpid = fork();
       if (childpid == 0)
       {
+        if (dish_context.is_interactive)
+        {
+          pid_t pid = getpid();
+          if (dish_context.pgid == 0) job_context->cmd_pgid = pid;
+          setpgid(pid, dish_context.pgid);
+          if (!job_context->background)
+            tcsetpgrp(dish_context.terminal, job_context->cmd_pgid);
+          
+          signal(SIGINT, SIG_DFL);
+          signal(SIGQUIT, SIG_DFL);
+          signal(SIGTSTP, SIG_DFL);
+          signal(SIGTTIN, SIG_DFL);
+          signal(SIGTTOU, SIG_DFL);
+          signal(SIGCHLD, SIG_DFL);
+        }
         auto cargs = get_cargs();
         cargs.emplace_back(static_cast<char *>(nullptr));
         execvp(cargs[0], cargs.data());
@@ -84,20 +98,27 @@ namespace dish::cmd
       }
       else
       {
+        pid = childpid;
+        if (dish_context.is_interactive)
+        {
+          if (!job_context->cmd_pgid)
+            job_context->cmd_pgid = pid;
+          setpgid(pid, job_context->cmd_pgid);
+        }
         int child_status;
         ret = WEXITSTATUS(child_status);
       }
     }
-    info->last_ret = ret;
-    return {childpid, ret};
+    dish_context.last_ret = ret;
+    return ret;
   }
   
-  void SimpleCmd::insert(std::string str)
+  void Process::insert(std::string str)
   {
     args.emplace_back(std::move(str));
   }
   
-  std::vector<char *> SimpleCmd::get_cargs() const
+  std::vector<char *> Process::get_cargs() const
   {
     std::vector<char *> vc;
     auto convert = [](const std::string &s) -> char *
@@ -108,12 +129,11 @@ namespace dish::cmd
     return vc;
   }
   
-  //Command
-  Command::Command(DishInfo *info_)
+  Job::Job(std::string cmd)
       : out(RedirectType::fd, 0), in(RedirectType::fd, 1),
-        err(RedirectType::fd, 2), background(false), info(info_) {}
+        err(RedirectType::fd, 2), background(false), command_str(std::move(cmd)) {}
   
-  int Command::execute()
+  int Job::launch()
   {
     int tmpin = dup(0);
     int tmpout = dup(1);
@@ -137,14 +157,14 @@ namespace dish::cmd
         return -1;
       }
     }
-  
+    
     int ret, pid = 0;
-    for (auto it = commands.begin(); it < commands.end(); ++it)
+    for (auto it = processes.begin(); it < processes.end(); ++it)
     {
       auto &scmd = *it;
       dup2(fdin, 0);
       close(fdin);
-      if (it + 1 == commands.cend())
+      if (it + 1 == processes.cend())
       {
         if (!out.is_description() || out.get_description() != 0)
         {
@@ -186,13 +206,9 @@ namespace dish::cmd
         fmt::println("close: {}", strerror(errno));
         return -1;
       }
-      info->background = background;
-      
-      auto ret_pair = scmd->execute();
-      ret = ret_pair.second;
-      pid = ret_pair.first;
+      ret = scmd.launch();
     }
-  
+    
     if (dup2(tmpin, 0) == -1)
     {
       fmt::println("dup2: {}", strerror(errno));
@@ -203,7 +219,7 @@ namespace dish::cmd
       fmt::println("dup2: {}", strerror(errno));
       return -1;
     }
-  
+    
     if (close(tmpin) == -1)
     {
       fmt::println("close: {}", strerror(errno));
@@ -214,23 +230,96 @@ namespace dish::cmd
       fmt::println("close: {}", strerror(errno));
       return -1;
     }
-    if (!info->background) waitpid(pid, nullptr, 0);
+    if (!dish_context.is_interactive)
+      wait();
+    else if (!background)
+      put_in_foreground(0);
+    else
+    {
+      format_job_info("launched");
+      put_in_background(0);
+    }
     return ret;
   }
   
-  void Command::insert(std::shared_ptr<SingleCmd> scmd)
+  void Job::put_in_foreground(int cont)
   {
-    commands.emplace_back(std::move(scmd));
-    commands.back()->set_info(info);
+    tcsetpgrp(dish_context.terminal, cmd_pgid);
+    if (cont)
+    {
+      tcsetattr(dish_context.terminal, TCSADRAIN, &job_tmodes);
+      if (kill(-cmd_pgid, SIGCONT) < 0)
+        fmt::println("kill (SIGCONT)");
+    }
+    
+    wait();
+    
+    //Put Dish in the foreground.
+    tcsetpgrp(dish_context.terminal, dish_context.pgid);
+    
+    tcgetattr(dish_context.terminal, &job_tmodes);
+    tcsetattr(dish_context.terminal, TCSADRAIN, &dish_context.tmodes);
   }
   
-  void Command::set_in(Redirect redirect) { in = std::move(redirect); }
+  void Job::put_in_background(int cont)
+  {
+    if (cont)
+    {
+      if (kill(-cmd_pgid, SIGCONT) < 0)
+        fmt::println("kill (SIGCONT)");
+    }
+  }
   
-  void Command::set_out(Redirect redirect) { out = std::move(redirect); }
+  void Job::insert(const Process &scmd)
+  {
+    processes.emplace_back(std::move(scmd));
+    processes.back().set_job_context(this);
+  }
   
-  void Command::set_err(Redirect redirect) { err = std::move(redirect); }
+  void Job::set_in(Redirect redirect) { in = std::move(redirect); }
   
-  void Command::set_info(DishInfo *dish_) { info = dish_; }
+  void Job::set_out(Redirect redirect) { out = std::move(redirect); }
   
-  void Command::set_background() { background = true; }
+  void Job::set_err(Redirect redirect) { err = std::move(redirect); }
+  
+  void Job::set_background()
+  {
+    background = true;
+  }
+  
+  bool Job::is_stopped()
+  {
+    for (auto &p: processes)
+    {
+      if (!p.completed && !p.stopped)
+        return false;
+    }
+    return true;
+  }
+  
+  bool Job::is_completed()
+  {
+    for (auto &p: processes)
+    {
+      if (!p.completed)
+        return false;
+    }
+    return true;
+  }
+  
+  void Job::wait()
+  {
+    int status;
+    pid_t pid;
+    do
+      pid = waitpid(WAIT_ANY, &status, WUNTRACED);
+    while (!mark_process_status(pid, status)
+           && !is_stopped()
+           && !is_completed());
+  }
+  
+  void Job::format_job_info(const std::string &status)
+  {
+    return fmt::println("{} [{}]: {}", cmd_pgid, status, command_str);
+  }
 }

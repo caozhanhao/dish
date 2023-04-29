@@ -15,8 +15,6 @@
 #define DISH_BUILTIN_HPP
 #pragma once
 
-#include "dish.hpp"
-
 #include <vector>
 #include <string>
 #include <functional>
@@ -25,28 +23,37 @@
 namespace dish::builtin
 {
   using Args = const std::vector<std::string> &;
-  using Func = std::function<int(DishInfo *, Args)>;
+  using Func = std::function<int(Args)>;
   
-  int builtin_cd(DishInfo *, Args args);
+  int builtin_cd(Args);
   
-  int builtin_pwd(DishInfo *, Args args);
+  int builtin_pwd(Args);
   
-  int builtin_export(DishInfo *, Args args);
+  int builtin_export(Args);
   
-  int builtin_exit(DishInfo *, Args);
+  int builtin_exit(Args);
   
-  int builtin_history(DishInfo *dish, Args args);
+  int builtin_history(Args);
   
-  int builtin_help(DishInfo *dish, Args args);
+  int builtin_help(Args);
+  
+  int builtin_jobs(Args);
+  
+  int builtin_fg(Args);
+  
+  int builtin_bg(Args);
   
   static const std::map<std::string, Func> builtins
       {
           {"cd",      builtin_cd},
-          {"pwd",      builtin_pwd},
-          {"export",    builtin_export},
+          {"pwd",     builtin_pwd},
+          {"export",  builtin_export},
           {"exit",    builtin_exit},
           {"history", builtin_history},
-          {"help",    builtin_help}
+          {"help",    builtin_help},
+          {"jobs",    builtin_jobs},
+          {"fg",      builtin_fg},
+          {"bg",      builtin_bg},
       };
 }
 #endif

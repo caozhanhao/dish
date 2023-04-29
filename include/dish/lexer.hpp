@@ -15,8 +15,7 @@
 #define DISH_LEXER_HPP
 #pragma once
 
-#include "error.hpp"
-#include "command.hpp"
+#include "job.hpp"
 
 #include <string>
 #include <optional>

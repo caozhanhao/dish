@@ -15,9 +15,8 @@
 #define DISH_PARSER_HPP
 #pragma once
 
-#include "error.hpp"
 #include "lexer.hpp"
-#include "command.hpp"
+#include "job.hpp"
 
 #include <string>
 #include <vector>
@@ -27,20 +26,19 @@ namespace dish::parser
   class Parser
   {
   private:
-    cmd::Command command;
-    std::shared_ptr<cmd::SingleCmd> scmd;
-    DishInfo *info;
+    job::Job command;
+    job::Process scmd;
     std::vector<lexer::Token> tokens;
     std::size_t pos;
   public:
-    Parser(DishInfo *info_, std::vector<lexer::Token> tokens);
+    Parser(const std::string& cmd, std::vector<lexer::Token> tokens_);
     
     int parse();
     
-    cmd::Command get_cmd() const;
+    job::Job get_cmd() const;
   
   private:
-    int parse_cmd(cmd::Command &);
+    int parse_cmd(job::Job &);
   };
 }
 #endif

@@ -13,22 +13,10 @@
 //   limitations under the License.
 
 #include "dish/dish.hpp"
-#include "dish/option.hpp"
-
-using namespace dish;
 
 int main(int argc, char **argv)
 {
-  Dish dish;
-  option::Option option(argc, argv);
-  option.add("dish", [&dish](option::Option::CallbackArgType args)
-  {
-    for (auto &cmd : args)
-    {
-      dish.run(cmd);
-    }
-  });
-  option.parse().run();
-  dish.loop();
+  dish::init();
+  dish::loop();
   return 0;
 }

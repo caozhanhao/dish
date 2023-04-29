@@ -11,12 +11,16 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_COMMAND_HPP
-#define DISH_COMMAND_HPP
+#ifndef DISH_JOB_HPP
+#define DISH_JOB_HPP
 #pragma once
 
-#include "error.hpp"
 #include "builtin.hpp"
+#include "dish.hpp"
+
+#include <sys/types.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include <string>
 #include <list>
@@ -24,8 +28,7 @@
 #include <variant>
 #include <memory>
 
-namespace dish { class Dish; }
-namespace dish::cmd
+namespace dish::job
 {
   enum class RedirectType
   {
@@ -46,58 +49,63 @@ namespace dish::cmd
     std::string get_filename() const;
     
     int get_description() const;
-  
+    
     int get() const;
   };
   
-  class Command;
+  class Job;
   
-  class SingleCmd
+  class Process
   {
-  protected:
-    DishInfo *info;
-  public:
-    virtual std::pair<int, int> execute() = 0;
-    
-    void set_info(DishInfo *dish_);
-  };
-  
-  class SimpleCmd : public SingleCmd
-  {
+    friend class Job;
   private:
+    Job *job_context;
     std::vector<std::string> args;
   public:
-    SimpleCmd() = default;
-  
-    std::pair<int, int> execute() override;
+    bool is_builtin;
+    int pid;
+    int status;
+    bool completed;
+    bool stopped;
+  public:
+    Process() : pid(-1), status(-1), completed(false), stopped(false){}
+    
+    int launch();
     
     void insert(std::string str);
     
     void clear();
     
     bool empty() const;
-  
+    
+    void set_job_context(Job *job_);
   private:
     const std::vector<std::string> &get_args() const;
     
     std::vector<char *> get_cargs() const;
   };
   
-  class Command
+  class Job
   {
+    friend class Process;
   private:
-    std::vector<std::shared_ptr<SingleCmd>> commands;
+    std::string command_str; //for message
     Redirect out;
     Redirect in;
     Redirect err;
     bool background;
-    DishInfo *info;
+    struct termios job_tmodes;
+    pid_t cmd_pgid;
   public:
-    Command(DishInfo *info_);
+    std::vector<Process> processes;
+    bool notified;
+  public:
+    Job() = default;
+    Job(std::string cmd);
     
-    int execute();
+    int launch();
     
-    void insert(std::shared_ptr<SingleCmd> scmd);
+    void insert(const Process &scmd);
     
     void set_in(Redirect redirect);
     
@@ -105,10 +113,19 @@ namespace dish::cmd
     
     void set_err(Redirect redirect);
     
-    void set_info(DishInfo *dish_);
-    
     void set_background();
+    
+    void put_in_foreground(int cont);
+    
+    void put_in_background(int cont);
+    
+    bool is_stopped();
+    
+    bool is_completed();
+    
+    void wait();
+    
+    void format_job_info(const std::string &status);
   };
-  
 }
 #endif

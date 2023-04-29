@@ -12,7 +12,6 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-#include "dish/error.hpp"
 #include "dish/utils.hpp"
 #include "dish/lexer.hpp"
 
@@ -75,6 +74,9 @@ namespace dish::lexer
             break;
           case TokenType::end:
             cmd_state = CmdState::end;
+            break;
+          case TokenType::background:
+            cmd_state = CmdState::background;
             break;
           default:
             fmt::println("Syntax Error: Unexpected '{}' after a command.\n{}", token.get_content(),
