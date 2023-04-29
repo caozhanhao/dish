@@ -29,7 +29,7 @@ namespace dish::cmd
 {
   enum class RedirectType
   {
-    output, input, appending
+    overwrite, append, input, fd
   };
   
   class Redirect
@@ -47,7 +47,7 @@ namespace dish::cmd
     
     int get_description() const;
   
-    int get(int mode) const;
+    int get() const;
   };
   
   class Command;
@@ -57,7 +57,7 @@ namespace dish::cmd
   protected:
     DishInfo *info;
   public:
-    virtual int execute() = 0;
+    virtual std::pair<int, int> execute() = 0;
     
     void set_info(DishInfo *dish_);
   };
@@ -68,8 +68,8 @@ namespace dish::cmd
     std::vector<std::string> args;
   public:
     SimpleCmd() = default;
-    
-    int execute() override;
+  
+    std::pair<int, int> execute() override;
     
     void insert(std::string str);
     
@@ -78,8 +78,6 @@ namespace dish::cmd
     bool empty() const;
   
   private:
-    void expand_wildcards();
-    
     const std::vector<std::string> &get_args() const;
     
     std::vector<char *> get_cargs() const;

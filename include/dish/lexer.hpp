@@ -26,13 +26,14 @@ namespace dish::lexer
 {
   enum class TokenType
   {
-    word, lt, rt, newline, pipe,
-    rt_and, rt_rt, rt_rt_and, background,
+    word, newline, pipe,
+    lt, rt, lt_lt, lt_lt_lt, rt_rt, lt_and, rt_and, lt_rt, background,
+    env_var,
     end
   };
   enum class CmdState
   {
-    init, word, io_modifier, pipe,  filename, background, end
+    init, word_or_env, io_modifier_file_name,io_modifier_file_desc, pipe, file, background, end
   };
   
   class Token
@@ -70,7 +71,7 @@ namespace dish::lexer
     std::optional<std::vector<Token>> get_all_tokens();
     
   private:
-    Token get_token();
+    std::optional<Token> get_token();
     
     int check_cmd(const Token &token);
     

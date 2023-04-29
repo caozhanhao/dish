@@ -22,12 +22,15 @@
 
 #include <sys/types.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #include <vector>
+#include <optional>
 #include <algorithm>
 #include <string>
 #include <regex>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace dish::utils
@@ -72,13 +75,20 @@ namespace dish::utils
     return colorify(str, Color::WHITE);
   }
   
+  static std::optional<std::string> expand_env_var(const std::string &s)
+  {
+    auto cptr = getenv(s.c_str());
+    if(cptr == nullptr)
+      return std::nullopt;
+    return std::string{cptr};
+  }
   static bool has_wildcards(const std::string &s)
   {
     return (s.find('*') != std::string::npos ||
             s.find('?') != std::string::npos);
   }
   
-  static std::vector<std::string> expand_wildcards(const std::string &s)
+  static std::optional<std::vector<std::string>> expand_wildcards(const std::string &s)
   {
     std::string pattern{'^'};
     for (auto it = s.cbegin(); it < s.cend(); ++it)
@@ -105,7 +115,8 @@ namespace dish::utils
     DIR *dir = opendir(".");
     if (dir == NULL)
     {
-      throw error::DishError(DISH_ERROR_LOCATION, __func__, std::string("opendir :") + strerror(errno));
+      fmt::println("opendir: {}", strerror(errno));
+      return std::nullopt;
     }
     
     std::regex re(pattern);
@@ -132,20 +143,29 @@ namespace dish::utils
     return ret;
   }
   
-  static std::string get_home()
+  static std::optional<std::string> get_home()
   {
     char const *home = getenv("HOME");
     if (home == nullptr) home = getenv("USERPROFILE");
     if (home == nullptr) home = getenv("HOMEDRIVE");
     if (home == nullptr) home = getenv("HOMEPATH");
-    if (home == nullptr) return "";
+    if (home == nullptr) return std::nullopt;
     return home;
   }
-  
-  static std::string simplify_path(const std::string &path)
+  static std::optional<std::string> get_working_directory()
   {
-    std::string home = get_home();
-    if (home.empty()) return path;
+    char buf[1024];
+    char *cwd = getcwd(buf, sizeof(buf));
+    if (cwd == NULL)
+      return std::nullopt;
+   return cwd;
+  }
+
+static std::string simplify_path(const std::string &path)
+  {
+    auto home_opt = get_home();
+    if (!home_opt.has_value()) return path;
+    auto home = home_opt.value();
     if (home.back() == '/') home.pop_back();
     auto [it1, it2] = std::mismatch(path.cbegin(), path.cend(), home.cbegin(), home.cend());
     if (it2 == home.cend())

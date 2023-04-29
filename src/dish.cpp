@@ -35,7 +35,7 @@ namespace dish
     auto tokens = lexer.get_all_tokens();
     if(!tokens.has_value()) return;
     parser::Parser parser{&info, tokens.value()};
-    parser.parse();
+    if(parser.parse() == -1) return;
     parser.get_cmd().execute();
   }
   

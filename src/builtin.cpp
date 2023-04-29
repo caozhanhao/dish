@@ -34,13 +34,13 @@ namespace dish::builtin
     }
     else if (args.size() == 1)
     {
-      auto home = utils::get_home();
-      if (home.empty())
+      auto home_opt = utils::get_home();
+      if (!home_opt.has_value())
       {
         fmt::println("cd: Can not find ~");
         return -1;
       }
-      if (chdir(home.c_str()) != 0)
+      if (chdir(home_opt.value().c_str()) != 0)
       {
         fmt::println("cd: {}", strerror(errno));
         return -1;
@@ -50,12 +50,13 @@ namespace dish::builtin
       std::string arg;
       if (args[1][0] == '~')
       {
-        arg = utils::get_home();
-        if (arg.empty())
+        auto home_opt = utils::get_home();
+        if (!home_opt.has_value())
         {
           fmt::println("cd: Can not find ~");
           return -1;
         }
+        arg = home_opt.value();
         if (arg.back() == '/') arg.pop_back();
         arg += args[1].substr(1);
       } else
@@ -72,16 +73,27 @@ namespace dish::builtin
   }
   int builtin_pwd(DishInfo *, Args args)
   {
-    if (args.size() != 0)
+    if (args.size() != 1)
     {
-      fmt::println("cd: too many arguments.");
+      fmt::println("pwd: too many arguments.");
       return -1;
     }
     else
     {
-    
+      auto cwd = utils::get_working_directory();
+      if(!cwd.has_value())
+      {
+        fmt::println("pwd: {}", strerror(errno));
+        return -1;
+      }
+      fmt::println(cwd.value());
     }
     return 1;
+  }
+  
+  int builtin_export(DishInfo *, Args)
+  {
+  
   }
   
   int builtin_exit(DishInfo *, Args)

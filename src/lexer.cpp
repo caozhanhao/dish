@@ -38,7 +38,8 @@ namespace dish::lexer
         switch (token.get_type())
         {
           case TokenType::word:
-            cmd_state = CmdState::word;
+          case TokenType::env_var:
+            cmd_state = CmdState::word_or_env;
             break;
           case TokenType::end:
             cmd_state = CmdState::end;
@@ -50,18 +51,24 @@ namespace dish::lexer
             break;
         }
         break;
-      case CmdState::word:
+      case CmdState::word_or_env:
         switch (token.get_type())
         {
           case TokenType::lt:
           case TokenType::rt:
           case TokenType::rt_rt:
+          case TokenType::lt_lt:
+          case TokenType::lt_lt_lt:
+          case TokenType::lt_rt:
+            cmd_state = CmdState::io_modifier_file_name;
+            break;
+          case TokenType::lt_and:
           case TokenType::rt_and:
-          case TokenType::rt_rt_and:
-            cmd_state = CmdState::io_modifier;
+            cmd_state = CmdState::io_modifier_file_desc;
             break;
           case TokenType::word:
-            cmd_state = CmdState::word;
+          case TokenType::env_var:
+            cmd_state = CmdState::word_or_env;
             break;
           case TokenType::pipe:
             cmd_state = CmdState::pipe;
@@ -80,7 +87,8 @@ namespace dish::lexer
         switch (token.get_type())
         {
           case TokenType::word:
-            cmd_state = CmdState::word;
+          case TokenType::env_var:
+            cmd_state = CmdState::word_or_env;
             break;
           case TokenType::end:
             fmt::println("Syntax Error: Unexpected end.");
@@ -93,11 +101,12 @@ namespace dish::lexer
             break;
         }
         break;
-      case CmdState::io_modifier:
+      case CmdState::io_modifier_file_name:
         switch (token.get_type())
         {
           case TokenType::word:
-            cmd_state = CmdState::filename;
+          case TokenType::env_var:
+            cmd_state = CmdState::file;
             break;
           case TokenType::pipe:
             cmd_state = CmdState::pipe;
@@ -113,16 +122,51 @@ namespace dish::lexer
             break;
         }
         break;
-      case CmdState::filename:
+      case CmdState::io_modifier_file_desc:
         switch (token.get_type())
         {
+          case TokenType::word:
+          {
+            auto fd = token.get_content();
+            for(auto& r : fd)
+            {
+              if(!std::isdigit(r))
+              {
+                fmt::println("Syntax Error: Invalid file descriptor.\n{}", token.get_content(),
+                             mark_error_from_token(token));
+                return -1;
+              }
+            }
+            cmd_state = CmdState::file;
+          }
+            break;
           case TokenType::pipe:
+            cmd_state = CmdState::pipe;
+            break;
+          case TokenType::end:
+            fmt::println("Syntax Error: Unexpected end.");
+            return -1;
+            break;
+          default:
+            fmt::println("Syntax Error: Unexpected '{}' after a io_modifier.\n{}", token.get_content(),
+                         mark_error_from_token(token));
+            return -1;
+            break;
+        }
+        break;
+      case CmdState::file:
+        switch (token.get_type())
+        {
           case TokenType::lt:
           case TokenType::rt:
           case TokenType::rt_rt:
+          case TokenType::lt_lt:
+          case TokenType::lt_rt:
+            cmd_state = CmdState::io_modifier_file_name;
+            break;
+          case TokenType::lt_and:
           case TokenType::rt_and:
-          case TokenType::rt_rt_and:
-            cmd_state = CmdState::io_modifier;
+            cmd_state = CmdState::io_modifier_file_desc;
             break;
           case TokenType::background:
             cmd_state = CmdState::background;
@@ -164,42 +208,89 @@ namespace dish::lexer
     std::vector<Token> ret;
     cmd_state = CmdState::init;
     pos = 0;
-    Token t;
     while (pos < text.size())
     {
-      t = get_token();
-      if(check_cmd(t) != 0)
+      auto t = get_token();
+      if (t.has_value())
+      {
+        if (check_cmd(t.value()) != 0)
+          return std::nullopt;
+        ret.emplace_back(t.value());
+      }
+      else
         return std::nullopt;
-      ret.emplace_back(std::move(t));
     }
-    if(check_cmd(Token{TokenType::end, "end", 0, 0}) != 0) return std::nullopt;
+    if (check_cmd(Token{TokenType::end, "end", 0, 0}) != 0) return std::nullopt;
     return ret;
   }
   
-  Token Lexer::get_token()
+  std::optional<Token> Lexer::get_token()
   {
     while (pos < text.size() && text[pos] == ' ') ++pos;
     if (pos < text.size() && text[pos] == '\n')
-      return {TokenType::newline, "\\n", pos++, 0};
+      return Token{TokenType::newline, "\\n", pos++, 0};
     else if (pos < text.size() && text[pos] == '|')
-      return {TokenType::pipe, "|", pos++, 1};
+      return Token{TokenType::pipe, "|", pos++, 1};
     else if (pos < text.size() && text[pos] == '&')
-      return {TokenType::background, "&", pos++, 1};
+      return Token{TokenType::background, "&", pos++, 1};
     else if (pos < text.size() && text[pos] == '<')
-      return {TokenType::rt, "<", pos++, 1};
+    {
+      if (pos < text.size() - 1 && text[pos + 1] == '<')
+      {
+        if (pos < text.size() - 2 && text[pos + 2] == '<')
+          return Token{TokenType::lt_lt_lt, "<<<", pos += 3, 3};
+        else
+          return Token{TokenType::lt_lt, "<<", pos += 2, 2};
+      }
+      else if (pos < text.size() - 1 && text[pos + 1] == '&')
+          return Token{TokenType::lt_and, "<&", pos += 2, 2};
+      else if (pos < text.size() - 1 && text[pos + 1] == '>')
+        return Token{TokenType::lt_rt, "<>", pos += 2, 2};
+      else
+        return Token{TokenType::lt, "<", pos++, 1};
+    }
     else if (pos < text.size() && text[pos] == '>')
     {
       if (pos < text.size() - 1 && text[pos + 1] == '>')
-      {
-        if (pos < text.size() - 2 && text[pos + 2] == '&')
-          return {TokenType::rt_rt_and, ">>&", pos += 2, 3};
-        else
-          return {TokenType::rt_rt, ">>", pos += 2, 2};
-      }
+        return Token{TokenType::rt_rt, ">>", pos += 2, 2};
       else if (pos < text.size() - 1 && text[pos + 1] == '&')
-        return {TokenType::rt_and, ">&", pos += 2, 2};
+        return Token{TokenType::rt_and, ">&", pos += 2, 2};
       else
-        return {TokenType::rt, ">", pos++, 1};
+        return Token{TokenType::rt, ">", pos++, 1};
+    }
+    else if (pos < text.size() && text[pos] == '$')
+    {
+      ++pos;
+      std::string tmp;
+      if(text[pos] == '{')
+      {
+        ++pos;
+        if(pos == text.size())
+        {
+          fmt::println("Synax Error: Unexpected end of token.");
+          return std::nullopt;
+        }
+        do
+        {
+          tmp += text[pos];
+          ++pos;
+        } while (pos < text.size() && text[pos] != '}');
+        if(pos == text.size() || text[pos] != '}')
+        {
+          fmt::println("Synax Error: Unexpected end of token.");
+          return std::nullopt;
+        }
+        pos++;//skip '}'
+      }
+      else
+      {
+        do
+        {
+          tmp += text[pos];
+          ++pos;
+        } while (pos < text.size() && !std::isspace(text[pos]));
+      }
+      return Token{TokenType::env_var, tmp, pos, tmp.size()};
     }
     else
     {
@@ -209,7 +300,7 @@ namespace dish::lexer
         tmp += text[pos];
         ++pos;
       } while (pos < text.size() && !std::isspace(text[pos]));
-      return {TokenType::word, tmp, pos, tmp.size()};
+      return Token{TokenType::word, tmp, pos, tmp.size()};
     }
   }
   

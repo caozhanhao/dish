@@ -37,16 +37,24 @@ namespace dish::cmd
   
   int Redirect::get_description() const { return std::get<int>(redirect); }
   
-  int Redirect::get(int mode) const
+  int Redirect::get() const
   {
-    if (is_description())
+    switch (type)
     {
-      return get_description();
+      case RedirectType::input:
+        return open(get_filename().c_str(), O_RDONLY);
+        break;
+      case RedirectType::overwrite:
+        return open(get_filename().c_str(), O_CREAT | O_TRUNC | O_WRONLY);
+        break;
+      case RedirectType::append:
+        return open(get_filename().c_str(), O_CREAT | O_APPEND | O_WRONLY);
+        break;
+      case RedirectType::fd:
+        return dup(get_description());
+        break;
     }
-    else
-    {
-      return open(get_filename().c_str(), mode);
-    }
+    return -1;
   }
   
   //SingleCmd
@@ -56,57 +64,37 @@ namespace dish::cmd
   }
   
   //SimpleCmd
-  int SimpleCmd::execute()
+  std::pair<int, int> SimpleCmd::execute()
   {
-    int ret = 0;
-    expand_wildcards();
+    int ret, childpid = 0;
     if (builtin::builtins.find(args[0]) != builtin::builtins.end())
     {
       ret = builtin::builtins.at(args[0])(info, args);
     }
     else
     {
-      int childpid = fork();
+      childpid = fork();
       if (childpid == 0)
       {
         auto cargs = get_cargs();
         cargs.emplace_back(static_cast<char *>(nullptr));
-        if (execvp(cargs[0], cargs.data()) == -1)
-        {
-          fmt::println("execvp: {}",  strerror(errno));
-        }
+        execvp(cargs[0], cargs.data());
+        fmt::println("execvp: {}", strerror(errno));
         std::exit(1);
-      } else
+      }
+      else
       {
         int child_status;
-        if (!info->background) waitpid(childpid, &child_status, 0);
         ret = WEXITSTATUS(child_status);
       }
     }
     info->last_ret = ret;
-    return ret;
+    return {childpid, ret};
   }
   
   void SimpleCmd::insert(std::string str)
   {
     args.emplace_back(std::move(str));
-  }
-  
-  void SimpleCmd::expand_wildcards()
-  {
-    for (auto it = args.begin(); it < args.end();)
-    {
-      if (utils::has_wildcards(*it))
-      {
-        auto expanded = utils::expand_wildcards(*it);
-        it = args.erase(it);
-        it = args.insert(it, std::make_move_iterator(expanded.begin()),
-                         std::make_move_iterator(expanded.end()));
-      } else
-      {
-        ++it;
-      }
-    }
   }
   
   std::vector<char *> SimpleCmd::get_cargs() const
@@ -122,8 +110,8 @@ namespace dish::cmd
   
   //Command
   Command::Command(DishInfo *info_)
-      : out(RedirectType::output, 0), in(RedirectType::input, 1),
-        err(RedirectType::output, 0), background(false), info(info_) {}
+      : out(RedirectType::fd, 0), in(RedirectType::fd, 1),
+        err(RedirectType::fd, 2), background(false), info(info_) {}
   
   int Command::execute()
   {
@@ -133,24 +121,24 @@ namespace dish::cmd
     int fdout = 0;
     if (!in.is_description() || in.get_description() != 1)
     {
-      fdin = in.get(O_RDONLY);
-      if(fdin == -1)
+      fdin = in.get();
+      if (fdin == -1)
       {
-        fmt::println("open: {}", strerror(errno));
+        fmt::println("open/dup: {}", strerror(errno));
         return -1;
       }
     }
     else
     {
       fdin = dup(tmpin);
-      if(fdin == -1)
+      if (fdin == -1)
       {
         fmt::println("dup: {}", strerror(errno));
         return -1;
       }
     }
-    
-    int ret = 0;
+  
+    int ret, pid = 0;
     for (auto it = commands.begin(); it < commands.end(); ++it)
     {
       auto &scmd = *it;
@@ -160,17 +148,17 @@ namespace dish::cmd
       {
         if (!out.is_description() || out.get_description() != 0)
         {
-          fdout = out.get(O_WRONLY);
-          if(fdout == -1)
+          fdout = out.get();
+          if (fdout == -1)
           {
-            fmt::println("open: {}", strerror(errno));
+            fmt::println("open/dup: {}", strerror(errno));
             return -1;
           }
         }
         else
         {
           fdout = dup(tmpout);
-          if(fdout == -1)
+          if (fdout == -1)
           {
             fmt::println("dup: {}", strerror(errno));
             return -1;
@@ -188,43 +176,45 @@ namespace dish::cmd
         fdout = fdpipe[1];
         fdin = fdpipe[0];
       }
-    
-      info->background = background;
-      ret = scmd->execute();
-    
-      if(dup2(fdout, 1) == -1)
+      if (dup2(fdout, 1) == -1)
       {
         fmt::println("dup2: {}", strerror(errno));
         return -1;
       }
-      if(close(fdout) == -1)
+      if (close(fdout) == -1)
       {
         fmt::println("close: {}", strerror(errno));
         return -1;
       }
+      info->background = background;
+      
+      auto ret_pair = scmd->execute();
+      ret = ret_pair.second;
+      pid = ret_pair.first;
     }
   
-    if(dup2(tmpin, 0) == -1)
+    if (dup2(tmpin, 0) == -1)
     {
       fmt::println("dup2: {}", strerror(errno));
       return -1;
     }
-    if(dup2(tmpout, 1) == -1)
+    if (dup2(tmpout, 1) == -1)
     {
       fmt::println("dup2: {}", strerror(errno));
       return -1;
     }
   
-    if(close(tmpin) == -1)
+    if (close(tmpin) == -1)
     {
       fmt::println("close: {}", strerror(errno));
       return -1;
     }
-    if(close(tmpout) == -1)
+    if (close(tmpout) == -1)
     {
       fmt::println("close: {}", strerror(errno));
       return -1;
     }
+    if (!info->background) waitpid(pid, nullptr, 0);
     return ret;
   }
   

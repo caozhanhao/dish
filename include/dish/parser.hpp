@@ -35,12 +35,12 @@ namespace dish::parser
   public:
     Parser(DishInfo *info_, std::vector<lexer::Token> tokens);
     
-    void parse();
+    int parse();
     
     cmd::Command get_cmd() const;
   
   private:
-    void parse_cmd(cmd::Command &);
+    int parse_cmd(cmd::Command &);
   };
 }
 #endif

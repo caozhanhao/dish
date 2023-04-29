@@ -31,6 +31,8 @@ namespace dish::builtin
   
   int builtin_pwd(DishInfo *, Args args);
   
+  int builtin_export(DishInfo *, Args args);
+  
   int builtin_exit(DishInfo *, Args);
   
   int builtin_history(DishInfo *dish, Args args);
@@ -41,6 +43,7 @@ namespace dish::builtin
       {
           {"cd",      builtin_cd},
           {"pwd",      builtin_pwd},
+          {"export",    builtin_export},
           {"exit",    builtin_exit},
           {"history", builtin_history},
           {"help",    builtin_help}
