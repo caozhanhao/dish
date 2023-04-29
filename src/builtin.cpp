@@ -77,7 +77,7 @@ namespace dish::builtin
       return -1;
     }
     dish_context.last_dir = last_dir;
-    return 1;
+    return 0;
   }
   int builtin_pwd(Args args)
   {
@@ -96,7 +96,7 @@ namespace dish::builtin
       }
       fmt::println(cwd.value());
     }
-    return 1;
+    return 0;
   }
   
   int builtin_export(Args)
@@ -105,19 +105,56 @@ namespace dish::builtin
   int builtin_jobs(Args)
   {
     update_status();
-    for (auto& job : dish_jobs)
+    for (size_t i = 0; i < dish_jobs.size(); ++i)
     {
+      auto& job = dish_jobs[i];
+      std::string job_info;
       if (job->is_completed())
-        job->format_job_info("completed");
+        job_info = job->format_job_info("completed");
       else if (job->is_stopped())
-        job->format_job_info("stopped");
+        job_info = job->format_job_info("stopped");
       else
-        job->format_job_info("running");
+        job_info = job->format_job_info("running");
+      fmt::println("[{}] {}", i + 1, job_info);
     }
-    return 1;
+    return 0;
   }
-  int builtin_fg(Args)
+  int builtin_fg(Args args)
   {
+    if (args.size() > 2)
+    {
+      fmt::println("fg: too many arguments.");
+      return -1;
+    }
+    else if (args.size() == 2)
+    {
+      int id;
+      try
+      {
+        id = std::stoi(args[1]);
+      }
+      catch(std::invalid_argument&)
+      {
+        fmt::println("fg: invalid argument.");
+        return -1;
+      }
+      if(id - 1 < 0 || id - 1 >= dish_jobs.size())
+      {
+        fmt::println("fg: invalid job id.");
+        return -1;
+      }
+      dish_jobs[id - 1]->continue_job();
+    }
+    else if (args.size() == 1)
+    {
+      if(dish_jobs.empty())
+      {
+        fmt::println("fg: no current job");
+        return -1;
+      }
+      dish_jobs.back()->continue_job();
+    }
+    return 0;
   }
   int builtin_bg(Args)
   {
@@ -136,7 +173,7 @@ namespace dish::builtin
       fmt::println("{}| {}", index, r);
       index++;
     }
-    return 1;
+    return 0;
   }
   
   int builtin_help(Args args)
@@ -150,6 +187,6 @@ namespace dish::builtin
         "These are builtin-commands. Use 'help' to see this.",
         fmt::join(list, ", ")
     );
-    return 1;
+    return 0;
   }
 }

@@ -93,12 +93,12 @@ namespace dish::job
     Redirect out;
     Redirect in;
     Redirect err;
-    bool background;
     struct termios job_tmodes;
     pid_t cmd_pgid;
   public:
     std::vector<Process> processes;
     bool notified;
+    bool background;
   public:
     Job() = default;
     Job(std::string cmd);
@@ -125,7 +125,9 @@ namespace dish::job
     
     void wait();
     
-    void format_job_info(const std::string &status);
+    std::string format_job_info(const std::string &status);
+
+    void continue_job();
   };
 }
 #endif

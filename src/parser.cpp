@@ -22,43 +22,39 @@
 
 namespace dish::parser
 {
-  Parser::Parser(const std::string& cmd, std::vector<lexer::Token> tokens_)
-      : command(cmd), tokens(tokens_), pos(0) {}
-  
+  Parser::Parser(const std::string &cmd, std::vector<lexer::Token> tokens_) : command(cmd), tokens(tokens_), pos(0) {}
+
   int Parser::parse()
   {
     pos = 0;
     while (pos < tokens.size())
     {
-      if(parse_cmd(command) == -1)
-        return -1;
+      if (parse_cmd(command) == -1) return -1;
     }
     return 0;
   }
-  
+
   job::Job Parser::get_cmd() const { return command; }
-  
+
   int Parser::parse_cmd(job::Job &cmd)
   {
-    auto add_scmd = [&cmd, this]()
-    {
+    auto add_scmd = [&cmd, this]() {
       job::Process scmd;
-      while (pos < tokens.size() &&
-      (tokens[pos].get_type() == lexer::TokenType::word || tokens[pos].get_type() == lexer::TokenType::env_var))
+      while (pos < tokens.size() && (tokens[pos].get_type() == lexer::TokenType::word ||
+                                     tokens[pos].get_type() == lexer::TokenType::env_var))
       {
         auto content = tokens[pos++].get_content();
         if (tokens[pos - 1].get_type() == lexer::TokenType::word)
         {
           auto expanded = utils::expand(content);
-          if(!expanded.has_value())
-            return -1;
-          for(auto& r : expanded.value())
+          if (!expanded.has_value()) return -1;
+          for (auto &r: expanded.value())
             scmd.insert(r);
         }
-        else if(tokens[pos - 1].get_type() == lexer::TokenType::env_var)
+        else if (tokens[pos - 1].get_type() == lexer::TokenType::env_var)
         {
           auto env = utils::expand_env_var(content);
-          if(!env.has_value())
+          if (!env.has_value())
           {
             fmt::println("Unknown environment variable: {}", content);
             return -1;
@@ -71,13 +67,13 @@ namespace dish::parser
       cmd.insert(scmd);
       return 0;
     };
-    if(add_scmd() == -1) return -1;
+    if (add_scmd() == -1) return -1;
     while (pos < tokens.size() && tokens[pos].get_type() == lexer::TokenType::pipe)
     {
       ++pos;
-      if(add_scmd() == -1) return -1;
+      if (add_scmd() == -1) return -1;
     }
-  
+
     while (pos < tokens.size())
     {
       switch (tokens[pos].get_type())

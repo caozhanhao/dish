@@ -64,7 +64,7 @@ namespace dish
       if (setpgid(dish_context.pgid, dish_context.pgid) < 0)
       {
         fmt::println("DishError: Failed to put the shell in its own process group.");
-        std::exit(1);
+        //std::exit(1);
       }
       tcsetpgrp(dish_context.terminal, dish_context.pgid);
       tcgetattr(dish_context.terminal, &dish_context.tmodes);
@@ -132,18 +132,21 @@ namespace dish
       auto &job = *job_it;
       if (job->is_completed())
       {
-        job->format_job_info("completed");
+        if(job->background)
+          fmt::println(job->format_job_info("completed"));
         job_it = dish_jobs.erase(job_it);
       }
       else if (job->is_stopped() && !job->notified)
       {
-        job->format_job_info("stopped");
+        if(job->background)
+          fmt::println(job->format_job_info("stopped"));
         job->notified = true;
         ++job_it;
       }
       else
         ++job_it;
     }
+    return;
   }
   
   [[noreturn]]void loop()

@@ -32,11 +32,11 @@ namespace dish::job
 {
   //Redirect
   bool Redirect::is_description() const { return redirect.index() == 0; }
-  
+
   std::string Redirect::get_filename() const { return std::get<std::string>(redirect); }
-  
+
   int Redirect::get_description() const { return std::get<int>(redirect); }
-  
+
   int Redirect::get() const
   {
     switch (type)
@@ -56,11 +56,12 @@ namespace dish::job
     }
     return -1;
   }
+
   void Process::set_job_context(Job *job_)
   {
     job_context = job_;
   }
-  
+
   int Process::launch()
   {
     int ret, childpid = 0;
@@ -82,7 +83,7 @@ namespace dish::job
           setpgid(pid, dish_context.pgid);
           if (!job_context->background)
             tcsetpgrp(dish_context.terminal, job_context->cmd_pgid);
-          
+
           signal(SIGINT, SIG_DFL);
           signal(SIGQUIT, SIG_DFL);
           signal(SIGTSTP, SIG_DFL);
@@ -112,27 +113,26 @@ namespace dish::job
     dish_context.last_ret = ret;
     return ret;
   }
-  
+
   void Process::insert(std::string str)
   {
     args.emplace_back(std::move(str));
   }
-  
+
   std::vector<char *> Process::get_cargs() const
   {
     std::vector<char *> vc;
-    auto convert = [](const std::string &s) -> char *
-    {
+    auto convert = [](const std::string &s) -> char * {
       return const_cast<char *>(s.c_str());
     };
     std::transform(args.begin(), args.end(), std::back_inserter(vc), convert);
     return vc;
   }
-  
+
   Job::Job(std::string cmd)
       : out(RedirectType::fd, 0), in(RedirectType::fd, 1),
         err(RedirectType::fd, 2), background(false), command_str(std::move(cmd)) {}
-  
+
   int Job::launch()
   {
     int tmpin = dup(0);
@@ -157,7 +157,7 @@ namespace dish::job
         return -1;
       }
     }
-    
+
     int ret, pid = 0;
     for (auto it = processes.begin(); it < processes.end(); ++it)
     {
@@ -208,7 +208,7 @@ namespace dish::job
       }
       ret = scmd.launch();
     }
-    
+
     if (dup2(tmpin, 0) == -1)
     {
       fmt::println("dup2: {}", strerror(errno));
@@ -219,7 +219,7 @@ namespace dish::job
       fmt::println("dup2: {}", strerror(errno));
       return -1;
     }
-    
+
     if (close(tmpin) == -1)
     {
       fmt::println("close: {}", strerror(errno));
@@ -236,12 +236,12 @@ namespace dish::job
       put_in_foreground(0);
     else
     {
-      format_job_info("launched");
+      fmt::println(format_job_info("launched"));
       put_in_background(0);
     }
     return ret;
   }
-  
+
   void Job::put_in_foreground(int cont)
   {
     tcsetpgrp(dish_context.terminal, cmd_pgid);
@@ -251,16 +251,16 @@ namespace dish::job
       if (kill(-cmd_pgid, SIGCONT) < 0)
         fmt::println("kill (SIGCONT)");
     }
-    
+
     wait();
-    
+
     //Put Dish in the foreground.
     tcsetpgrp(dish_context.terminal, dish_context.pgid);
-    
+
     tcgetattr(dish_context.terminal, &job_tmodes);
     tcsetattr(dish_context.terminal, TCSADRAIN, &dish_context.tmodes);
   }
-  
+
   void Job::put_in_background(int cont)
   {
     if (cont)
@@ -269,24 +269,24 @@ namespace dish::job
         fmt::println("kill (SIGCONT)");
     }
   }
-  
+
   void Job::insert(const Process &scmd)
   {
     processes.emplace_back(std::move(scmd));
     processes.back().set_job_context(this);
   }
-  
+
   void Job::set_in(Redirect redirect) { in = std::move(redirect); }
-  
+
   void Job::set_out(Redirect redirect) { out = std::move(redirect); }
-  
+
   void Job::set_err(Redirect redirect) { err = std::move(redirect); }
-  
+
   void Job::set_background()
   {
     background = true;
   }
-  
+
   bool Job::is_stopped()
   {
     for (auto &p: processes)
@@ -296,7 +296,7 @@ namespace dish::job
     }
     return true;
   }
-  
+
   bool Job::is_completed()
   {
     for (auto &p: processes)
@@ -306,20 +306,29 @@ namespace dish::job
     }
     return true;
   }
-  
+
   void Job::wait()
   {
     int status;
     pid_t pid;
     do
       pid = waitpid(WAIT_ANY, &status, WUNTRACED);
-    while (!mark_process_status(pid, status)
-           && !is_stopped()
-           && !is_completed());
+    while (!mark_process_status(pid, status) && !is_stopped() && !is_completed());
   }
-  
-  void Job::format_job_info(const std::string &status)
+
+  [[nodiscard]]std::string Job::format_job_info(const std::string &status)
   {
-    return fmt::println("{} [{}]: {}", cmd_pgid, status, command_str);
+    return fmt::format("{} [{}]: {}", cmd_pgid, status, command_str);
+  }
+
+  void Job::continue_job()
+  {
+    for (auto &p: processes)
+      p.stopped = 0;
+    notified = 0;
+    if (!background)
+      put_in_foreground (1);
+    else
+      put_in_background (1);
   }
 }
