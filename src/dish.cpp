@@ -24,11 +24,13 @@
 #include <pwd.h>
 
 #include <iostream>
-#include <thread>
 #include <string>
 #include <memory>
 #include <functional>
 #include <vector>
+#include <filesystem>
+
+extern char ** environ;
 
 namespace dish
 {
@@ -57,6 +59,26 @@ namespace dish
             {"ls", "ls --color=tty"},
             {"grep", "grep --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn,.idea,.tox}"}
     };
+
+    char ** envir = environ;
+    while(*envir)
+    {
+      std::string tmp{*envir};
+      auto eq = tmp.find('=');
+      if(eq == std::string::npos)
+      {
+        fmt::println("Unexpected env: {}", tmp);
+        std::exit(-1);
+      }
+      dish_context.env[tmp.substr(0, eq)] = tmp.substr(eq + 1);
+      envir++;
+    }
+
+    dish_context.env["PWD"] = std::filesystem::current_path().string();
+    dish_context.env["HOME"] = getpwuid(getuid())->pw_dir;
+
+    if(dish_context.env.find("PATH") == dish_context.env.end())
+      dish_context.env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
     if (dish_context.is_interactive)
     {
@@ -95,7 +117,7 @@ namespace dish
   
   void do_job_notification()
   {
-    for (auto job_it = dish_context.jobs.begin(); job_it < dish_context.jobs.end();)
+    for (auto job_it = dish_context.jobs.begin(); job_it != dish_context.jobs.end();)
     {
       auto &job = *job_it;
       job->update_status();
@@ -117,7 +139,16 @@ namespace dish
     }
     return;
   }
-  
+
+  std::vector<std::string> get_path()
+  {
+    std::vector<std::string> ret;
+    if(auto it = dish_context.env.find("PATH"); it != dish_context.env.end())
+      ret = utils::split<std::vector<std::string>>(it->second, ":");
+    ret.emplace_back(std::filesystem::current_path().string());
+    return ret;
+  }
+
   [[noreturn]]void loop()
   {
     while (true)
@@ -129,7 +160,7 @@ namespace dish
       fmt::print("\n> Dish {}@{}:{} {} \n{} ",
                  utils::blue(getpwuid(uid)->pw_name),
                  utils::green(hostname),
-                 utils::yellow(utils::simplify_path(utils::get_working_directory().value())),
+                 utils::yellow(utils::simplify_path(std::filesystem::current_path().string())),
                  dish_context.last_foreground_ret == 0 ? "" : utils::red("C: " + std::to_string(dish_context.last_foreground_ret)),
                  utils::red(uid == 0 ? "#" : "$"));
 

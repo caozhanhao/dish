@@ -15,6 +15,8 @@
 #define DISH_UTILS_HPP
 #pragma once
 
+#include "dish.hpp"
+
 #define FMT_HEADER_ONLY
 #include "bundled/fmt/core.h"
 
@@ -24,8 +26,10 @@
 
 #include <vector>
 #include <optional>
+#include <list>
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <regex>
 #include <cstdio>
 #include <cstdlib>
@@ -75,27 +79,31 @@ namespace dish::utils
   
   static std::optional<std::string> expand_env_var(const std::string &s)
   {
-    auto cptr = getenv(s.c_str());
-    if(cptr == nullptr)
-      return std::nullopt;
-    return std::string{cptr};
+    if(auto it = dish_context.env.find(s); it != dish_context.env.end())
+      return it->second;
+    return std::nullopt;
   }
   static bool has_wildcards(const std::string &s)
   {
     return (s.find('*') != std::string::npos ||
             s.find('?') != std::string::npos);
   }
-  
+
   static std::optional<std::string> get_home()
   {
-    char const *home = getenv("HOME");
-    if (home == nullptr) home = getenv("USERPROFILE");
-    if (home == nullptr) home = getenv("HOMEDRIVE");
-    if (home == nullptr) home = getenv("HOMEPATH");
-    if (home == nullptr) return std::nullopt;
-    std::string home_str = home;
-    if(*home_str.rbegin() == '/') home_str.pop_back();
-    return home_str;
+    std::string home;
+    const std::vector<std::string> env_to_find{"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"};
+    for(auto& r : env_to_find)
+    {
+      if(auto it = dish_context.env.find(r); it != dish_context.env.end())
+      {
+        home = it->second;
+        break;
+      }
+    }
+    if(home.empty()) return std::nullopt;
+    if(*home.rbegin() == '/') home.pop_back();
+    return home;
   }
   
   static std::optional<std::vector<std::string>> expand(const std::string &str)
@@ -181,15 +189,6 @@ namespace dish::utils
     return {{s}};
   }
   
-  static std::optional<std::string> get_working_directory()
-  {
-    char buf[1024];
-    char *cwd = getcwd(buf, sizeof(buf));
-    if (cwd == NULL)
-      return std::nullopt;
-   return cwd;
-  }
-
 static std::string simplify_path(const std::string &path)
   {
     auto home_opt = get_home();
@@ -201,6 +200,31 @@ static std::string simplify_path(const std::string &path)
       return "~" + path.substr(home.size());
     }
     return path;
+  }
+
+  template<typename T>
+  static T split(std::string_view str, std::string_view delims = " ")
+  {
+    T ret;
+    size_t first = 0;
+    while (first < str.size())
+    {
+      const auto second = str.find_first_of(delims, first);
+      if (first != second)
+        ret.insert(ret.end(), typename T::value_type{str.substr(first, second - first)});
+      if (second == std::string_view::npos)
+        break;
+      first = second + 1;
+    }
+    return ret;
+  }
+
+  template<typename T>
+  auto&& list_at(const std::list<T>& list, size_t index)
+  {
+    auto it = list.begin();
+    std::advance(it, index);
+    return *it;
   }
 }
 #endif

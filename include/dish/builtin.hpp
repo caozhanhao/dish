@@ -31,6 +31,8 @@ namespace dish::builtin
 
   int builtin_export(Args);
 
+  int builtin_unset(Args);
+
   int builtin_exit(Args);
 
   int builtin_history(Args);
@@ -49,6 +51,7 @@ namespace dish::builtin
           {"cd", builtin_cd},
           {"pwd", builtin_pwd},
           {"export", builtin_export},
+          {"unset", builtin_unset},
           {"exit", builtin_exit},
           {"history", builtin_history},
           {"help", builtin_help},

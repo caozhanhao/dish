@@ -225,12 +225,17 @@ namespace dish::lexer
       {
         if (check_cmd(t.value()) != 0)
           return std::nullopt;
-        ret.emplace_back(t.value());
+        if(t.value().get_type() != TokenType::end)
+          ret.emplace_back(t.value());
       }
       else
         return std::nullopt;
     }
-    if (check_cmd(Token{TokenType::end, "end", 0, 0}) != 0) return std::nullopt;
+    if (cmd_state != CmdState::end)
+    {
+      if (check_cmd(Token{TokenType::end, "end", 0, 0}) != 0)
+        return std::nullopt;
+    }
     return ret;
   }
   
@@ -253,7 +258,7 @@ namespace dish::lexer
           return Token{TokenType::lt_lt, "<<", pos += 2, 2};
       }
       else if (pos < text.size() - 1 && text[pos + 1] == '&')
-          return Token{TokenType::lt_and, "<&", pos += 2, 2};
+        return Token{TokenType::lt_and, "<&", pos += 2, 2};
       else if (pos < text.size() - 1 && text[pos + 1] == '>')
         return Token{TokenType::lt_rt, "<>", pos += 2, 2};
       else
@@ -272,10 +277,10 @@ namespace dish::lexer
     {
       ++pos;
       std::string tmp;
-      if(text[pos] == '{')
+      if (text[pos] == '{')
       {
         ++pos;
-        if(pos == text.size())
+        if (pos == text.size())
         {
           fmt::println("Synax Error: Unexpected end of token.");
           return std::nullopt;
@@ -285,7 +290,7 @@ namespace dish::lexer
           tmp += text[pos];
           ++pos;
         } while (pos < text.size() && text[pos] != '}');
-        if(pos == text.size() || text[pos] != '}')
+        if (pos == text.size() || text[pos] != '}')
         {
           fmt::println("Synax Error: Unexpected end of token.");
           return std::nullopt;
@@ -302,6 +307,8 @@ namespace dish::lexer
       }
       return Token{TokenType::env_var, tmp, pos, tmp.size()};
     }
+    else if (pos >= text.size())
+      return Token{TokenType::end, "end", 0, 0};
     else
     {
       std::string tmp;
@@ -312,6 +319,7 @@ namespace dish::lexer
       } while (pos < text.size() && !std::isspace(text[pos]));
       return Token{TokenType::word, tmp, pos, tmp.size()};
     }
+    return Token{TokenType::end, "end", 0, 0};
   }
   
   std::string Lexer::mark_error_from_token(const Token &token) const

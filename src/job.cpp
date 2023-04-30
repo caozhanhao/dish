@@ -23,6 +23,7 @@
 #include <string>
 #include <variant>
 #include <thread>
+#include <filesystem>
 #include <algorithm>
 #include <vector>
 #include <list>
@@ -68,7 +69,6 @@ namespace dish::job
     int childpid = 0;
     if (builtin::builtins.find(args[0]) != builtin::builtins.end())
     {
-      is_builtin = true;
       dish_context.last_foreground_ret = builtin::builtins.at(args[0])(args);
       completed = true;
       do_job_notification();
@@ -94,10 +94,9 @@ namespace dish::job
           signal(SIGTTOU, SIG_DFL);
           signal(SIGCHLD, SIG_DFL);
         }
-        auto cargs = get_cargs();
-        cargs.emplace_back(static_cast<char *>(nullptr));
-        execvp(cargs[0], cargs.data());
-        fmt::println("execvp: {}", strerror(errno));
+        auto cargs = get_args();
+        execv(cargs[0], cargs.data());
+        fmt::println("execv: {}", strerror(errno));
         std::exit(1);
       }
       else
@@ -128,15 +127,56 @@ namespace dish::job
     return args.clear();
   }
 
-  std::vector<char *> Process::get_cargs() const
+  std::vector<char *> Process::get_args() const
   {
-    std::vector<char *> vc;
-    auto convert = [](const std::string &s) -> char * {
-      return const_cast<char *>(s.c_str());
-    };
-    std::transform(args.begin(), args.end(), std::back_inserter(vc), convert);
-    return vc;
+    std::vector<char *> cargs;
+    auto convert = [](const std::string &s) -> char * { return const_cast<char *>(s.c_str()); };
+    std::transform(args.begin(), args.end(), std::back_inserter(cargs), convert);
+    cargs.emplace_back(static_cast<char *>(nullptr));
+    return cargs;
   }
+
+  int Process::find_cmd()
+  {
+    if (args.empty())
+    {
+      fmt::println("No args");
+      return -1;
+    }
+
+    if(builtin::builtins.find(args[0]) != builtin::builtins.end())
+    {
+      is_builtin = true;
+      return 0;
+    }
+    bool found = false;
+    std::string path_to_exe;
+    for (auto path: get_path())
+    {
+      path_to_exe = path + "/" + args[0];
+      if (std::filesystem::exists(path_to_exe))
+      {
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+    {
+      fmt::println("dish: command not found: {}", args[0]);
+      return -1;
+    }
+    auto p = std::filesystem::status(path_to_exe).permissions();
+    if (!(((p & std::filesystem::perms::owner_exec) != std::filesystem::perms::none) ||
+         ((p & std::filesystem::perms::group_exec) != std::filesystem::perms::none) ||
+         ((p & std::filesystem::perms::others_exec) != std::filesystem::perms::none)))
+    {
+      fmt::println("dish: permission denied: {}", args[0]);
+      return -1;
+    }
+    args[0] = path_to_exe;
+    return 0;
+  }
+
   Job::Job(std::string cmd)
       : out(RedirectType::fd, 0), in(RedirectType::fd, 1),
         err(RedirectType::fd, 2), background(false), command_str(std::move(cmd)),
@@ -147,6 +187,11 @@ namespace dish::job
 
   int Job::launch()
   {
+    for(auto& r : processes)
+    {
+      if(r.find_cmd() != 0)
+        return -1;
+    }
     int tmpin = dup(0);
     int tmpout = dup(1);
     int fdin = 0;

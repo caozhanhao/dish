@@ -20,9 +20,10 @@
 #include <unistd.h>
 
 #include <vector>
+#include <list>
+#include <algorithm>
+#include <filesystem>
 #include <string>
-
-extern char ** environ;
 
 namespace dish::builtin
 {
@@ -39,11 +40,8 @@ namespace dish::builtin
       return -1;
     }
   
-    auto last_dir_opt = utils::get_working_directory();
-    std::string last_dir = "/";
-    if(last_dir_opt.has_value())
-      last_dir = last_dir_opt.value();
-    
+    std::string last_dir = std::filesystem::current_path().string();
+
     if (args.size() == 1)
     {
       auto home_opt = utils::get_home();
@@ -67,6 +65,7 @@ namespace dish::builtin
           fmt::println("cd: {}", strerror(errno));
           return -1;
         }
+        dish_context.env["PWD"] = dish_context.last_dir;
       }
       else
       {
@@ -74,10 +73,14 @@ namespace dish::builtin
         return -1;
       }
     }
-    else if (chdir(args[1].c_str()) != 0)
+    else
     {
-      fmt::println("cd: {}", strerror(errno));
-      return -1;
+      if (chdir(args[1].c_str()) != 0)
+      {
+        fmt::println("cd: {}", strerror(errno));
+        return -1;
+      }
+      dish_context.env["PWD"] = args[1];
     }
     dish_context.last_dir = last_dir;
     return 0;
@@ -91,13 +94,14 @@ namespace dish::builtin
     }
     else
     {
-      auto cwd = utils::get_working_directory();
-      if(!cwd.has_value())
+      if(auto it = dish_context.env.find("PWD"); it != dish_context.env.end())
+        fmt::println(it->second);
+      else
       {
-        fmt::println("pwd: {}", strerror(errno));
-        return -1;
+        auto path = std::filesystem::current_path().string();
+        dish_context.env["PWD"] = path;
+        fmt::println(path);
       }
-      fmt::println(cwd.value());
     }
     return 0;
   }
@@ -106,12 +110,8 @@ namespace dish::builtin
   {
     if(args.size() == 1)
     {
-      char ** envir = environ;
-      while(*envir)
-      {
-        fmt::println("{}",*envir);
-        envir++;
-      }
+      for(auto& r : dish_context.env)
+        fmt::println("{}={}", r.first, r.second);
     }
     else if(args.size() == 2)
     {
@@ -120,20 +120,44 @@ namespace dish::builtin
       {
         auto name = args[1].substr(0, eq);
         auto value = args[1].substr(eq + 1);
-        if(setenv(name.c_str(), value.c_str(), 1) == -1)
-        {
-          fmt::println("setenv: {}", strerror(errno));
-          return -1;
-        }
+        dish_context.env[name] = value;
       }
+      else
+        dish_context.env[args[1]] = "";
     }
     return 0;
   }
+
+  int builtin_unset(Args args)
+  {
+    if(args.size() < 2)
+    {
+      fmt::println("unset: too few arguments.");
+      return -1;
+    }
+    else if(args.size() > 2)
+    {
+      fmt::println("unset: too many arguments.");
+      return -1;
+    }
+    else
+    {
+      auto it = dish_context.env.find(args[1]);
+      if(it == dish_context.env.end())
+      {
+        fmt::println("unset: Unknown name.");
+        return -1;
+      }
+      dish_context.env.erase(it);
+    }
+    return 0;
+  }
+
   int builtin_jobs(Args)
   {
     for (size_t i = 0; i < dish_context.jobs.size(); ++i)
     {
-      auto& job = dish_context.jobs[i];
+      auto& job = utils::list_at(dish_context.jobs, i);
       job->update_status();
       std::string job_info;
       if (job->is_completed())
@@ -170,11 +194,11 @@ namespace dish::builtin
         fmt::println("fg: invalid job id.");
         return -1;
       }
-      job = dish_context.jobs[id - 1];
+      job = utils::list_at(dish_context.jobs, id - 1);
     }
     else if (args.size() == 1)
     {
-      for (auto it = dish_context.jobs.crbegin(); it < dish_context.jobs.crend(); ++it)
+      for (auto it = dish_context.jobs.crbegin(); it != dish_context.jobs.crend(); ++it)
       {
         if ((*it)->is_background() || (*it)->is_stopped())
           job = *it;
@@ -218,11 +242,11 @@ namespace dish::builtin
         fmt::println("bg: invalid job id.");
         return -1;
       }
-      job = dish_context.jobs[id - 1];
+      job = utils::list_at(dish_context.jobs, id - 1);
     }
     else if (args.size() == 1)
     {
-      for (auto it = dish_context.jobs.crbegin(); it < dish_context.jobs.crend(); ++it)
+      for (auto it = dish_context.jobs.crbegin(); it != dish_context.jobs.crend(); ++it)
       {
         if ((*it)->is_background() || (*it)->is_stopped())
           job = *it;

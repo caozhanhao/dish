@@ -20,8 +20,8 @@
 #include <unistd.h>
 
 #include <string>
-#include <map>
 #include <vector>
+#include <list>
 #include <atomic>
 #include <memory>
 #include <map>
@@ -35,8 +35,9 @@ namespace dish
     int last_foreground_ret;
     std::string last_dir;
     std::map<std::string, std::string> alias;
-    std::vector<std::string> history;
-    std::vector<std::shared_ptr<job::Job>> jobs;
+    std::map<std::string,std::string> env;
+    std::list<std::string> history;
+    std::list<std::shared_ptr<job::Job>> jobs;
 
     pid_t pgid;
     struct termios tmodes;
@@ -54,8 +55,10 @@ namespace dish
   
   [[noreturn]] extern void loop();
   
-  extern std::vector<std::string> get_history();
+  extern std::list<std::string> get_history();
   
   extern void do_job_notification();
+
+  extern std::vector<std::string> get_path();
 }
 #endif

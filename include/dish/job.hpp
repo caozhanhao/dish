@@ -83,10 +83,10 @@ namespace dish::job
     bool empty() const;
     
     void set_job_context(Job *job_);
+
+    int find_cmd();
   private:
-    const std::vector<std::string> &get_args() const;
-    
-    std::vector<char *> get_cargs() const;
+    std::vector<char *> get_args() const;
   };
   
   class Job

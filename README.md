@@ -1,6 +1,28 @@
-# Dish - A friendly shell
+<h2 align="center">
+Dish
+</h2> 
 
-[![License](https://img.shields.io/github/license/caozhanhao/dish?style=flat-square)](LICENSE)
-![Language](https://img.shields.io/github/languages/top/caozhanhao/dish?style=flat-square)
+<p align="center">
+<strong>A Simple Shell</strong>
+</p>
 
-- The project is not completed.
+<p align="center">
+  <a href="LICENSE" >
+    <img src="https://img.shields.io/github/license/caozhanhao/dish?label=License&style=flat-square&color=yellow" alt="License" />  
+  </a>
+</p>
+
+### Supported Features
+- job control
+- built-in (cd, pwd, jobs, fg ...)  
+- variable/~/wildcards expansion
+- To be continued
+
+### Reference
+- [Implementing a Job Control Shell](https://www.gnu.org/software/libc/manual/html_node/Implementing-a-Shell.html)
+- [build-your-own-shell](https://github.com/tokenrove/build-your-own-shell)
+- [Writing Your Own Shell](https://www.cs.purdue.edu/homes/grr/SystemsProgrammingBook/Book/Chapter5-WritingYourOwnShell.pdf)
+- [Tutorial - Write a Shell in C](https://brennan.io/2015/01/16/write-a-shell-in-c/)
+
+### Bundled
+- [fmtlib](https://github.com/fmtlib/fmt)
