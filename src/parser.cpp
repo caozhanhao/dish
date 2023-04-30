@@ -71,15 +71,7 @@ namespace dish::parser
         }
         // environment variable
         else if (tokens[pos - 1].get_type() == lexer::TokenType::env_var)
-        {
-          auto env = utils::expand_env_var(content);
-          if (!env.has_value())
-          {
-            fmt::println("Unknown environment variable: {}", content);
-            return -1;
-          }
-          scmd.insert(env.value());
-        }
+          scmd.insert(utils::get_dish_env(content));
         else
           scmd.insert(content);
       }

@@ -47,6 +47,8 @@ namespace dish::builtin
 
   int builtin_alias(Args);
 
+  int builtin_type(Args);
+
   static const std::map<std::string, Func> builtins{
           {"cd", builtin_cd},
           {"pwd", builtin_pwd},
@@ -59,6 +61,7 @@ namespace dish::builtin
           {"fg", builtin_fg},
           {"bg", builtin_bg},
           {"alias", builtin_alias},
+          {"type", builtin_type}
   };
 }
 #endif

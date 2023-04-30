@@ -59,6 +59,6 @@ namespace dish
   
   extern void do_job_notification();
 
-  extern std::vector<std::string> get_path();
+  extern std::vector<std::string> get_path(bool with_curr = true);
 }
 #endif

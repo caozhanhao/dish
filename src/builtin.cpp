@@ -322,4 +322,39 @@ namespace dish::builtin
     );
     return 0;
   }
+
+  int builtin_type(Args args)
+  {
+    if (args.size() == 1)
+    {
+      fmt::println("type: too few arguments.");
+      return -1;
+    }
+    for (auto it = args.cbegin() + 1; it != args.cend(); ++it)
+    {
+      if (auto alias = dish_context.alias.find(*it); alias != dish_context.alias.end())
+        fmt::println("{} is an alias for {}", *it, alias->second);
+      else if(builtins.find(*it) != builtins.end())
+        fmt::println("{} is a shell builtin", *it, alias->second);
+      else
+      {
+        bool found = false;
+        std::string path;
+        for (auto p : get_path(false))
+        {
+          path = p + "/" + *it;
+          if (std::filesystem::exists(path))
+          {
+            found = true;
+            break;
+          }
+        }
+        if(!found)
+          fmt::println("{} not found", *it);
+        else
+          fmt::println("{} is {}", *it, path);
+      }
+    }
+    return 0;
+  }
 }

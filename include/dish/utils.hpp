@@ -77,11 +77,11 @@ namespace dish::utils
     return colorify(str, Color::WHITE);
   }
   
-  static std::optional<std::string> expand_env_var(const std::string &s)
+  static std::string get_dish_env(const std::string &s)
   {
     if(auto it = dish_context.env.find(s); it != dish_context.env.end())
       return it->second;
-    return std::nullopt;
+    return "";
   }
   static bool has_wildcards(const std::string &s)
   {

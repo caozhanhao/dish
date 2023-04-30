@@ -140,12 +140,13 @@ namespace dish
     return;
   }
 
-  std::vector<std::string> get_path()
+  std::vector<std::string> get_path(bool with_curr)
   {
     std::vector<std::string> ret;
     if(auto it = dish_context.env.find("PATH"); it != dish_context.env.end())
       ret = utils::split<std::vector<std::string>>(it->second, ":");
-    ret.emplace_back(std::filesystem::current_path().string());
+    if(with_curr)
+      ret.emplace_back(std::filesystem::current_path().string());
     return ret;
   }
 

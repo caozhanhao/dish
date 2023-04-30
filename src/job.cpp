@@ -138,9 +138,8 @@ namespace dish::job
 
   int Process::find_cmd()
   {
-    if (args.empty())
+    if (args.empty() || args[0].empty())
     {
-      fmt::println("No args");
       return -1;
     }
 
