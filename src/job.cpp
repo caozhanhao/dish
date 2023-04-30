@@ -22,6 +22,7 @@
 
 #include <string>
 #include <variant>
+#include <thread>
 #include <algorithm>
 #include <vector>
 #include <list>
@@ -62,15 +63,15 @@ namespace dish::job
     job_context = job_;
   }
 
-  int Process::launch()
+  void Process::launch()
   {
-    int ret, childpid = 0;
+    int childpid = 0;
     if (builtin::builtins.find(args[0]) != builtin::builtins.end())
     {
       is_builtin = true;
-      ret = builtin::builtins.at(args[0])(args);
+      dish_context.last_foreground_ret = builtin::builtins.at(args[0])(args);
       completed = true;
-      do_job_notification(0);
+      do_job_notification();
     }
     else
     {
@@ -104,14 +105,12 @@ namespace dish::job
         pid = childpid;
         if (dish_context.is_interactive)
         {
-          if (!job_context->cmd_pgid)
-            job_context->cmd_pgid = pid;
-          setpgid(pid, job_context->cmd_pgid);
+          if (job_context->cmd_pgid == 0)
+            job_context->cmd_pgid = childpid;
+          setpgid(childpid, job_context->cmd_pgid);
         }
       }
     }
-    dish_context.last_ret = ret;
-    return ret;
   }
 
   void Process::insert(std::string str)
@@ -171,7 +170,6 @@ namespace dish::job
       }
     }
 
-    int ret = 0;
     for (auto it = processes.begin(); it < processes.end(); ++it)
     {
       auto &scmd = *it;
@@ -219,7 +217,7 @@ namespace dish::job
         fmt::println("close: {}", strerror(errno));
         return -1;
       }
-      ret = scmd.launch();
+      scmd.launch();
     }
 
     if (dup2(tmpin, 0) == -1)
@@ -252,7 +250,7 @@ namespace dish::job
       fmt::println(format_job_info("launched"));
       put_in_background(0);
     }
-    return ret;
+    return 0;
   }
 
   void Job::put_in_foreground(int cont)
@@ -279,7 +277,7 @@ namespace dish::job
     if (cont)
     {
       if (kill(-cmd_pgid, SIGCONT) < 0)
-        fmt::println("kill (SIGCONT)");
+        fmt::println("kill (SIGCONT): {}", strerror(errno));
     }
   }
 
@@ -298,6 +296,11 @@ namespace dish::job
   void Job::set_background()
   {
     background = true;
+  }
+
+  void Job::set_foreground()
+  {
+    background = false;
   }
 
   bool Job::is_stopped()
@@ -325,13 +328,77 @@ namespace dish::job
     return true;
   }
 
+  bool Job::is_builtin()
+  {
+    for (auto &p: processes)
+    {
+      if (!p.is_builtin)
+        return false;
+    }
+    return true;
+  }
+
+  int Job::mark_status(int pid, int status)
+  {
+    if (pid > 0)
+    {
+      for (auto &p: processes)
+      {
+        if (p.pid == pid)
+        {
+          p.status = status;
+          if (WIFSTOPPED(status))
+            p.stopped = true;
+          else
+          {
+            p.completed = true;
+            if (WIFSIGNALED(status))
+              fmt::println("{}: Terminated by signal {}.", pid, WTERMSIG(p.status));
+            else if (WIFEXITED(status))
+            {
+              auto es = WEXITSTATUS(status);
+              p.exit_status = es;
+              if (!is_background())
+                dish_context.last_foreground_ret = es;
+            }
+          }
+          return 0;
+        }
+      }
+      fmt::println("mark_status: No such child process {}.", pid);
+      return -1;
+    }
+    else if (pid == 0 || errno == ECHILD)
+      return -1;
+    fmt::println("waitpid: {}", strerror(errno));
+    return -1;
+  }
+
   void Job::wait()
   {
-    int status;
-    pid_t pid;
-    do
-      pid = waitpid(-processes.back().pid, &status, WUNTRACED);
-    while (!mark_process_status(pid, status) && !is_stopped() && !is_completed());
+    if (!is_builtin())
+    {
+      int status;
+      pid_t pid;
+      dish_context.waiting = true;
+      do
+        pid = waitpid(WAIT_ANY, &status, WUNTRACED);
+      while (!mark_status(pid, status) && !is_stopped() && !is_completed());
+      dish_context.waiting = false;
+    }
+    do_job_notification();
+  }
+
+  void Job::update_status()
+  {
+    if(!is_builtin())
+    {
+      int status;
+      pid_t pid;
+      do
+        pid = waitpid(WAIT_ANY, &status, WUNTRACED|WNOHANG);
+      while(!mark_status(pid, status)&& !is_stopped() && !is_completed());
+    }
   }
 
   [[nodiscard]]std::string Job::format_job_info(const std::string &status)

@@ -22,6 +22,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <atomic>
 #include <memory>
 #include <map>
 
@@ -31,7 +32,7 @@ namespace dish
 
   struct DishContext
   {
-    int last_ret;
+    int last_foreground_ret;
     std::string last_dir;
     std::map<std::string, std::string> alias;
     std::vector<std::string> history;
@@ -41,6 +42,8 @@ namespace dish
     struct termios tmodes;
     int terminal;
     int is_interactive;
+
+    std::atomic<bool> waiting;
   };
 
   extern DishContext dish_context;
@@ -53,10 +56,6 @@ namespace dish
   
   extern std::vector<std::string> get_history();
   
-  extern void do_job_notification(int i);
-  
-  extern int mark_process_status(int pid, int status);
-  
-  extern void update_status();
+  extern void do_job_notification();
 }
 #endif

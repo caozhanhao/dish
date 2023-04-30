@@ -24,6 +24,7 @@
 #include <pwd.h>
 
 #include <iostream>
+#include <thread>
 #include <string>
 #include <memory>
 #include <functional>
@@ -37,11 +38,18 @@ namespace dish
   {
     return lexer::Lexer(cmd).get_all_tokens_no_check().value();
   }
+  void sigchld_handler(int sig)
+  {
+    if(!dish_context.waiting)
+      do_job_notification();
+  }
+
   void init()
   {
-    dish_context.last_ret = 0;
+    dish_context.last_foreground_ret = 0;
     dish_context.last_dir = "/";
-  
+    dish_context.waiting = false;
+
     dish_context.terminal = STDIN_FILENO;
     dish_context.is_interactive = isatty(dish_context.terminal);
 
@@ -49,7 +57,7 @@ namespace dish
             {"ls", "ls --color=tty"},
             {"grep", "grep --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn,.idea,.tox}"}
     };
-    
+
     if (dish_context.is_interactive)
     {
       while (tcgetpgrp(dish_context.terminal) != (dish_context.pgid = getpgrp()))
@@ -60,13 +68,8 @@ namespace dish
       signal(SIGTSTP, SIG_IGN);
       signal(SIGTTIN, SIG_IGN);
       signal(SIGTTOU, SIG_IGN);
-      
-      struct sigaction sigchild;
-      sigemptyset(&sigchild.sa_mask);
-      sigchild.sa_flags = 0;
-      sigchild.sa_handler = do_job_notification;
-      sigaction(SIGCHLD, &sigchild, nullptr);
-  
+      signal(SIGCHLD, sigchld_handler);
+
       dish_context.pgid = getpid();
       if (setpgid(dish_context.pgid, dish_context.pgid) < 0)
       {
@@ -90,53 +93,12 @@ namespace dish
     dish_context.jobs.back()->launch();
   }
   
-  int mark_process_status(int pid, int status)
+  void do_job_notification()
   {
-    if (pid > 0)
-    {
-      for (auto &job : dish_context.jobs)
-      {
-        for (auto &p: job->processes)
-        {
-          if (p.pid == pid)
-          {
-            p.status = status;
-            if (WIFSTOPPED(status))
-              p.stopped = true;
-            else
-            {
-              p.completed = true;
-              if (WIFSIGNALED(status))
-                fmt::println("{}: Terminated by signal {}.", pid, WTERMSIG (p.status));
-            }
-            return 0;
-          }
-        }
-        fmt::println("No child process {}.", pid);
-        return -1;
-      }
-    }
-    else if (pid == 0 || errno == ECHILD)
-      return -1;
-    fmt::println("waitpid: {}", strerror(errno));
-    return -1;
-  }
-  
-  void update_status()
-  {
-    int status;
-    pid_t pid;
-    do
-      pid = waitpid(WAIT_ANY, &status, WUNTRACED | WNOHANG);
-    while (!mark_process_status(pid, status));
-  }
-  
-  void do_job_notification(int i)
-  {
-    update_status();
     for (auto job_it = dish_context.jobs.begin(); job_it < dish_context.jobs.end();)
     {
       auto &job = *job_it;
+      job->update_status();
       if (job->is_completed())
       {
         if(job->is_background())
@@ -168,7 +130,7 @@ namespace dish
                  utils::blue(getpwuid(uid)->pw_name),
                  utils::green(hostname),
                  utils::yellow(utils::simplify_path(utils::get_working_directory().value())),
-                 dish_context.last_ret == 0 ? "" : utils::red("C: " + std::to_string(dish_context.last_ret)),
+                 dish_context.last_foreground_ret == 0 ? "" : utils::red("C: " + std::to_string(dish_context.last_foreground_ret)),
                  utils::red(uid == 0 ? "#" : "$"));
 
       std::cin.clear();

@@ -65,12 +65,15 @@ namespace dish::job
     bool is_builtin;
     int pid;
     int status;
+    int exit_status;
     bool completed;
     bool stopped;
   public:
-    Process() : pid(-1), status(-1), completed(false), stopped(false){}
-    
-    int launch();
+    Process()
+        : pid(-1), status(-1), completed(false),
+          stopped(false), exit_status(-1), is_builtin(false), job_context(nullptr){}
+
+    void launch();
     
     void insert(std::string str);
     
@@ -114,7 +117,9 @@ namespace dish::job
     void set_err(Redirect redirect);
     
     void set_background();
-    
+
+    void set_foreground();
+
     void put_in_foreground(int cont);
     
     void put_in_background(int cont);
@@ -124,12 +129,18 @@ namespace dish::job
     bool is_background();
 
     bool is_completed();
-    
+
+    bool is_builtin();
+
     void wait();
-    
+
+
     std::string format_job_info(const std::string &status);
 
     void continue_job();
+    void update_status();
+  private:
+    int mark_status(int, int);
   };
 }
 #endif

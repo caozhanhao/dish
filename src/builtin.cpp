@@ -131,10 +131,10 @@ namespace dish::builtin
   }
   int builtin_jobs(Args)
   {
-    update_status();
     for (size_t i = 0; i < dish_context.jobs.size(); ++i)
     {
       auto& job = dish_context.jobs[i];
+      job->update_status();
       std::string job_info;
       if (job->is_completed())
         job_info = job->format_job_info("completed");
@@ -148,6 +148,7 @@ namespace dish::builtin
   }
   int builtin_fg(Args args)
   {
+    std::shared_ptr<job::Job> job = nullptr;
     if (args.size() > 2)
     {
       fmt::println("fg: too many arguments.");
@@ -159,43 +160,86 @@ namespace dish::builtin
       try
       {
         id = std::stoi(args[1]);
-      }
-      catch(std::invalid_argument&)
+      } catch (std::invalid_argument &)
       {
         fmt::println("fg: invalid argument.");
         return -1;
       }
-      if(id - 1 < 0 || id - 1 >= dish_context.jobs.size())
+      if (id - 1 < 0 || id - 1 >= dish_context.jobs.size())
       {
         fmt::println("fg: invalid job id.");
         return -1;
       }
-      dish_context.jobs[id - 1]->continue_job();
+      job = dish_context.jobs[id - 1];
     }
     else if (args.size() == 1)
     {
-      std::shared_ptr<job::Job> job = nullptr;
-      for(auto it = dish_context.jobs.crbegin();it < dish_context.jobs.crend(); ++it)
+      for (auto it = dish_context.jobs.crbegin(); it < dish_context.jobs.crend(); ++it)
       {
-        if((*it)->is_background() || (*it)->is_stopped())
+        if ((*it)->is_background() || (*it)->is_stopped())
           job = *it;
       }
-      if(job == nullptr)
+      if (job == nullptr)
       {
         fmt::println("fg: no current job");
         return -1;
       }
-      fmt::println(job->format_job_info("running"));
-      if(job->is_stopped())
-        job->continue_job();
-      else
-        job->put_in_foreground(0);
     }
+    fmt::println(job->format_job_info("running"));
+    job->set_foreground();
+    if (job->is_stopped())
+      job->continue_job();
+    else
+      job->put_in_foreground(0);
     return 0;
   }
 
-  int builtin_bg(Args)
+  int builtin_bg(Args args)
   {
+    std::shared_ptr<job::Job> job = nullptr;
+    if (args.size() > 2)
+    {
+      fmt::println("bg: too many arguments.");
+      return -1;
+    }
+    else if (args.size() == 2)
+    {
+      int id;
+      try
+      {
+        id = std::stoi(args[1]);
+      } catch (std::invalid_argument &)
+      {
+        fmt::println("bg: invalid argument.");
+        return -1;
+      }
+      if (id - 1 < 0 || id - 1 >= dish_context.jobs.size())
+      {
+        fmt::println("bg: invalid job id.");
+        return -1;
+      }
+      job = dish_context.jobs[id - 1];
+    }
+    else if (args.size() == 1)
+    {
+      for (auto it = dish_context.jobs.crbegin(); it < dish_context.jobs.crend(); ++it)
+      {
+        if ((*it)->is_background() || (*it)->is_stopped())
+          job = *it;
+      }
+      if (job == nullptr)
+      {
+        fmt::println("bg: no current job");
+        return -1;
+      }
+    }
+    fmt::println(job->format_job_info("running"));
+    job->set_background();
+    if (job->is_stopped())
+      job->continue_job();
+    else
+      job->put_in_background(0);
+    return 0;
   }
   
   int builtin_exit(Args)
