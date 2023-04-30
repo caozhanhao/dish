@@ -95,10 +95,10 @@ namespace dish::job
     Redirect err;
     struct termios job_tmodes;
     pid_t cmd_pgid;
+    bool background;
   public:
     std::vector<Process> processes;
     bool notified;
-    bool background;
   public:
     Job() = default;
     Job(std::string cmd);
@@ -120,7 +120,9 @@ namespace dish::job
     void put_in_background(int cont);
     
     bool is_stopped();
-    
+
+    bool is_background();
+
     bool is_completed();
     
     void wait();

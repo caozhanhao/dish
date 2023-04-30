@@ -11,12 +11,11 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_LEXER_HPP
-#define DISH_LEXER_HPP
+#ifndef DISH_TOKEN_HPP
+#define DISH_TOKEN_HPP
 #pragma once
 
 #include "job.hpp"
-#include "token.hpp"
 
 #include <string>
 #include <optional>
@@ -24,30 +23,35 @@
 
 namespace dish::lexer
 {
-  enum class CmdState
+  enum class TokenType
   {
-    init, word_or_env, io_modifier_file_name,io_modifier_file_desc, pipe, file, background, end
+    word, newline, pipe,
+    lt, rt, lt_lt, lt_lt_lt, rt_rt, lt_and, rt_and, lt_rt, background,
+    env_var,
+    end
   };
-  
-  class Lexer
+
+  class Token
   {
   private:
-    std::string text;
+    TokenType type;
+    std::string content;
     std::size_t pos;
-    CmdState cmd_state;
+    std::size_t size;
   public:
-    Lexer(std::string cmd) : text(cmd), pos(0) {}
-  
-    std::optional<std::vector<Token>> get_all_tokens();
+    Token() = default;
+    Token(TokenType type_, std::string content_, std::size_t pos_, std::size_t size_)
+        : type(type_), content(std::move(content_)), pos(pos_), size(size_) {}
 
-    std::optional<std::vector<Token>> get_all_tokens_no_check();
+    TokenType get_type() const;
 
-  private:
-    std::optional<Token> get_token();
-    
-    int check_cmd(const Token &token);
-    
-    std::string mark_error_from_token(const Token &token) const;
+    std::string get_content() const;
+
+    std::size_t get_pos() const;
+
+    std::size_t get_size() const;
+
+    void set_content(std::string c);
   };
 }
 #endif

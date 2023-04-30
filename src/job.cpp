@@ -70,6 +70,7 @@ namespace dish::job
       is_builtin = true;
       ret = builtin::builtins.at(args[0])(args);
       completed = true;
+      do_job_notification(0);
     }
     else
     {
@@ -79,8 +80,9 @@ namespace dish::job
         if (dish_context.is_interactive)
         {
           pid_t pid = getpid();
-          if (dish_context.pgid == 0) job_context->cmd_pgid = pid;
-          setpgid(pid, dish_context.pgid);
+          if (job_context->cmd_pgid == 0)
+            job_context->cmd_pgid = pid;
+          setpgid(pid, job_context->cmd_pgid);
           if (!job_context->background)
             tcsetpgrp(dish_context.terminal, job_context->cmd_pgid);
 
@@ -106,8 +108,6 @@ namespace dish::job
             job_context->cmd_pgid = pid;
           setpgid(pid, job_context->cmd_pgid);
         }
-        int child_status;
-        ret = WEXITSTATUS(child_status);
       }
     }
     dish_context.last_ret = ret;
@@ -119,6 +119,16 @@ namespace dish::job
     args.emplace_back(std::move(str));
   }
 
+  bool Process::empty() const
+  {
+    return args.empty();
+  }
+
+  void Process::clear()
+  {
+    return args.clear();
+  }
+
   std::vector<char *> Process::get_cargs() const
   {
     std::vector<char *> vc;
@@ -128,10 +138,13 @@ namespace dish::job
     std::transform(args.begin(), args.end(), std::back_inserter(vc), convert);
     return vc;
   }
-
   Job::Job(std::string cmd)
       : out(RedirectType::fd, 0), in(RedirectType::fd, 1),
-        err(RedirectType::fd, 2), background(false), command_str(std::move(cmd)) {}
+        err(RedirectType::fd, 2), background(false), command_str(std::move(cmd)),
+        notified(false), cmd_pgid(0)
+  {
+    tcgetattr (dish_context.terminal, &job_tmodes);
+  }
 
   int Job::launch()
   {
@@ -158,7 +171,7 @@ namespace dish::job
       }
     }
 
-    int ret, pid = 0;
+    int ret = 0;
     for (auto it = processes.begin(); it < processes.end(); ++it)
     {
       auto &scmd = *it;
@@ -297,6 +310,11 @@ namespace dish::job
     return true;
   }
 
+  bool Job::is_background()
+  {
+    return background;
+  }
+
   bool Job::is_completed()
   {
     for (auto &p: processes)
@@ -312,7 +330,7 @@ namespace dish::job
     int status;
     pid_t pid;
     do
-      pid = waitpid(WAIT_ANY, &status, WUNTRACED);
+      pid = waitpid(-processes.back().pid, &status, WUNTRACED);
     while (!mark_process_status(pid, status) && !is_stopped() && !is_completed());
   }
 
@@ -324,7 +342,7 @@ namespace dish::job
   void Job::continue_job()
   {
     for (auto &p: processes)
-      p.stopped = 0;
+      p.stopped = false;
     notified = 0;
     if (!background)
       put_in_foreground (1);

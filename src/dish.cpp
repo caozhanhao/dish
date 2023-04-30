@@ -31,10 +31,12 @@
 
 namespace dish
 {
-  std::vector<std::string> dish_history;
   dish::DishContext dish_context;
-  std::vector<std::shared_ptr<dish::job::Job>> dish_jobs;
-  
+
+  auto to_token(const std::string& cmd)
+  {
+    return lexer::Lexer(cmd).get_all_tokens_no_check().value();
+  }
   void init()
   {
     dish_context.last_ret = 0;
@@ -42,6 +44,11 @@ namespace dish
   
     dish_context.terminal = STDIN_FILENO;
     dish_context.is_interactive = isatty(dish_context.terminal);
+
+    dish_context.alias = {
+            {"ls", "ls --color=tty"},
+            {"grep", "grep --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn,.idea,.tox}"}
+    };
     
     if (dish_context.is_interactive)
     {
@@ -73,21 +80,21 @@ namespace dish
   
   void run(const std::string &cmd)
   {
-    dish_history.emplace_back(cmd);
+    dish_context.history.emplace_back(cmd);
     lexer::Lexer lexer{cmd};
     auto tokens = lexer.get_all_tokens();
     if (!tokens.has_value()) return;
     parser::Parser parser{cmd, tokens.value()};
     if (parser.parse() == -1) return;
-    dish_jobs.emplace_back(std::make_shared<job::Job>(parser.get_cmd()));
-    dish_jobs.back()->launch();
+    dish_context.jobs.emplace_back(std::make_shared<job::Job>(parser.get_cmd()));
+    dish_context.jobs.back()->launch();
   }
   
   int mark_process_status(int pid, int status)
   {
     if (pid > 0)
     {
-      for (auto &job : dish_jobs)
+      for (auto &job : dish_context.jobs)
       {
         for (auto &p: job->processes)
         {
@@ -127,19 +134,19 @@ namespace dish
   void do_job_notification(int i)
   {
     update_status();
-    for (auto job_it = dish_jobs.begin(); job_it < dish_jobs.end();)
+    for (auto job_it = dish_context.jobs.begin(); job_it < dish_context.jobs.end();)
     {
       auto &job = *job_it;
       if (job->is_completed())
       {
-        if(job->background)
-          fmt::println(job->format_job_info("completed"));
-        job_it = dish_jobs.erase(job_it);
+        if(job->is_background())
+          fmt::println("\n{}", job->format_job_info("completed"));
+        job_it = dish_context.jobs.erase(job_it);
       }
       else if (job->is_stopped() && !job->notified)
       {
-        if(job->background)
-          fmt::println(job->format_job_info("stopped"));
+        if(job->is_background())
+          fmt::println("\n{}", job->format_job_info("stopped"));
         job->notified = true;
         ++job_it;
       }
@@ -157,12 +164,14 @@ namespace dish
       char hostname[256];
       gethostname(hostname, sizeof(hostname));
       auto uid = getuid();
-      fmt::print("> Dish {}@{}:{} {} \n{} ",
+      fmt::print("\n> Dish {}@{}:{} {} \n{} ",
                  utils::blue(getpwuid(uid)->pw_name),
                  utils::green(hostname),
                  utils::yellow(utils::simplify_path(utils::get_working_directory().value())),
                  dish_context.last_ret == 0 ? "" : utils::red("C: " + std::to_string(dish_context.last_ret)),
                  utils::red(uid == 0 ? "#" : "$"));
+
+      std::cin.clear();
       std::getline(std::cin, cmd);
       if (!cmd.empty())
       {

@@ -17,9 +17,12 @@
 #include "dish/dish.hpp"
 #include "dish/builtin.hpp"
 
+#include <unistd.h>
+
 #include <vector>
 #include <string>
-#include <unistd.h>
+
+extern char ** environ;
 
 namespace dish::builtin
 {
@@ -99,15 +102,39 @@ namespace dish::builtin
     return 0;
   }
   
-  int builtin_export(Args)
+  int builtin_export(Args args)
   {
+    if(args.size() == 1)
+    {
+      char ** envir = environ;
+      while(*envir)
+      {
+        fmt::println("{}",*envir);
+        envir++;
+      }
+    }
+    else if(args.size() == 2)
+    {
+      auto eq = args[1].find('=');
+      if(eq != std::string::npos)
+      {
+        auto name = args[1].substr(0, eq);
+        auto value = args[1].substr(eq + 1);
+        if(setenv(name.c_str(), value.c_str(), 1) == -1)
+        {
+          fmt::println("setenv: {}", strerror(errno));
+          return -1;
+        }
+      }
+    }
+    return 0;
   }
   int builtin_jobs(Args)
   {
     update_status();
-    for (size_t i = 0; i < dish_jobs.size(); ++i)
+    for (size_t i = 0; i < dish_context.jobs.size(); ++i)
     {
-      auto& job = dish_jobs[i];
+      auto& job = dish_context.jobs[i];
       std::string job_info;
       if (job->is_completed())
         job_info = job->format_job_info("completed");
@@ -115,7 +142,7 @@ namespace dish::builtin
         job_info = job->format_job_info("stopped");
       else
         job_info = job->format_job_info("running");
-      fmt::println("[{}] {}", i + 1, job_info);
+      fmt::println( job_info);
     }
     return 0;
   }
@@ -138,37 +165,75 @@ namespace dish::builtin
         fmt::println("fg: invalid argument.");
         return -1;
       }
-      if(id - 1 < 0 || id - 1 >= dish_jobs.size())
+      if(id - 1 < 0 || id - 1 >= dish_context.jobs.size())
       {
         fmt::println("fg: invalid job id.");
         return -1;
       }
-      dish_jobs[id - 1]->continue_job();
+      dish_context.jobs[id - 1]->continue_job();
     }
     else if (args.size() == 1)
     {
-      if(dish_jobs.empty())
+      std::shared_ptr<job::Job> job = nullptr;
+      for(auto it = dish_context.jobs.crbegin();it < dish_context.jobs.crend(); ++it)
+      {
+        if((*it)->is_background() || (*it)->is_stopped())
+          job = *it;
+      }
+      if(job == nullptr)
       {
         fmt::println("fg: no current job");
         return -1;
       }
-      dish_jobs.back()->continue_job();
+      fmt::println(job->format_job_info("running"));
+      if(job->is_stopped())
+        job->continue_job();
+      else
+        job->put_in_foreground(0);
     }
     return 0;
   }
+
   int builtin_bg(Args)
   {
   }
   
   int builtin_exit(Args)
   {
+    std::exit(0);
     return 0;
   }
-  
+
+  int builtin_alias(Args args)
+  {
+    if(args.size() == 1)
+    {
+      for(auto& r : dish_context.alias)
+        fmt::println("{}={}", r.first, r.second);
+    }
+    else if(args.size() == 2)
+    {
+      auto eq = args[1].find('=');
+      if(eq != std::string::npos)
+      {
+        auto name = args[1].substr(0, eq);
+        auto alias = args[1].substr(eq + 1);
+        dish_context.alias[name] = alias;
+      }
+      else
+      {
+        auto it = dish_context.alias.find(args[1]);
+        if (it != dish_context.alias.end())
+          fmt::println("{}={}", it->first, it->second);
+      }
+    }
+    return 0;
+  }
+
   int builtin_history(Args args)
   {
     int index = 1;
-    for (auto &r : dish_history)
+    for (auto &r : dish_context.history)
     {
       fmt::println("{}| {}", index, r);
       index++;

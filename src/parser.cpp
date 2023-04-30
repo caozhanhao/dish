@@ -44,6 +44,24 @@ namespace dish::parser
                                      tokens[pos].get_type() == lexer::TokenType::env_var))
       {
         auto content = tokens[pos++].get_content();
+        // alias
+        if(scmd.empty())
+        {
+          auto it = dish_context.alias.find(content);
+          if(it != dish_context.alias.end())
+          {
+            tokens.erase(tokens.begin() + pos - 1);
+            auto alias = lexer::Lexer(it->second).get_all_tokens_no_check();
+            if (!alias.has_value())
+            {
+              fmt::println("Failed to parse alias.");
+              return -1;
+            }
+            tokens.insert(tokens.begin() + pos - 1, std::make_move_iterator(alias.value().begin()),
+                          std::make_move_iterator(alias.value().end()));
+          }
+        }
+        // glob and ~
         if (tokens[pos - 1].get_type() == lexer::TokenType::word)
         {
           auto expanded = utils::expand(content);
@@ -51,6 +69,7 @@ namespace dish::parser
           for (auto &r: expanded.value())
             scmd.insert(r);
         }
+        // environment variable
         else if (tokens[pos - 1].get_type() == lexer::TokenType::env_var)
         {
           auto env = utils::expand_env_var(content);

@@ -21,14 +21,6 @@
 
 namespace dish::lexer
 {
-  TokenType Token::get_type() const { return type; }
-  
-  std::string Token::get_content() const { return content; }
-  
-  std::size_t Token::get_pos() const { return pos; }
-  
-  std::size_t Token::get_size() const { return size; }
-  
   int Lexer::check_cmd(const Token &token)
   {
     switch (cmd_state)
@@ -204,7 +196,23 @@ namespace dish::lexer
     }
     return 0;
   }
-  
+
+  std::optional<std::vector<Token>> Lexer::get_all_tokens_no_check()
+  {
+    std::vector<Token> ret;
+    cmd_state = CmdState::init;
+    pos = 0;
+    while (pos < text.size())
+    {
+      auto t = get_token();
+      if (t.has_value())
+        ret.emplace_back(t.value());
+      else
+        return std::nullopt;
+    }
+    return ret;
+  }
+
   std::optional<std::vector<Token>> Lexer::get_all_tokens()
   {
     std::vector<Token> ret;

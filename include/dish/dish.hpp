@@ -23,25 +23,28 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <map>
 
 namespace dish
 {
+  namespace job{class Job;}
+
   struct DishContext
   {
     int last_ret;
     std::string last_dir;
-    
+    std::map<std::string, std::string> alias;
+    std::vector<std::string> history;
+    std::vector<std::shared_ptr<job::Job>> jobs;
+
     pid_t pgid;
     struct termios tmodes;
     int terminal;
     int is_interactive;
   };
-  namespace job{class Job;}
-  
-  extern std::vector<std::string> dish_history;
+
   extern DishContext dish_context;
-  extern std::vector<std::shared_ptr<job::Job>> dish_jobs;
-  
+
   extern void init();
   
   extern void run(const std::string &cmd);
