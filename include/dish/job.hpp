@@ -41,6 +41,7 @@ namespace dish::job
     RedirectType type;
     std::variant<int, std::string> redirect;
   public:
+    Redirect() = default;
     template<typename T, typename = std::enable_if_t<!std::is_base_of_v<Redirect, std::decay_t<T>>>>
     Redirect(RedirectType type_, T &&redirect_) : type(type_), redirect(redirect_) {}
     

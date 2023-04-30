@@ -382,7 +382,7 @@ namespace dish::job
       pid_t pid;
       dish_context.waiting = true;
       do
-        pid = waitpid(WAIT_ANY, &status, WUNTRACED);
+        pid = waitpid(-1, &status, WUNTRACED);
       while (!mark_status(pid, status) && !is_stopped() && !is_completed());
       dish_context.waiting = false;
     }
@@ -396,7 +396,7 @@ namespace dish::job
       int status;
       pid_t pid;
       do
-        pid = waitpid(WAIT_ANY, &status, WUNTRACED|WNOHANG);
+        pid = waitpid(-1, &status, WUNTRACED|WNOHANG);
       while(!mark_status(pid, status)&& !is_stopped() && !is_completed());
     }
   }
