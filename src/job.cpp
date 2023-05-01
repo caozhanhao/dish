@@ -95,7 +95,7 @@ namespace dish::job
           signal(SIGCHLD, SIG_DFL);
         }
         auto cargs = get_args();
-        execv(cargs[0], cargs.data());
+        execv(cmd_path.c_str(), cargs.data());
         fmt::println("execv: {}", strerror(errno));
         std::exit(1);
       }
@@ -172,7 +172,7 @@ namespace dish::job
       fmt::println("dish: permission denied: {}", args[0]);
       return -1;
     }
-    args[0] = path_to_exe;
+    cmd_path = path_to_exe;
     return 0;
   }
 

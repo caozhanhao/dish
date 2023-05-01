@@ -62,6 +62,7 @@ namespace dish::job
   private:
     Job *job_context;
     std::vector<std::string> args;
+    std::string cmd_path;
   public:
     bool is_builtin;
     int pid;
@@ -85,7 +86,7 @@ namespace dish::job
     void set_job_context(Job *job_);
 
     int find_cmd();
-  private:
+
     std::vector<char *> get_args() const;
   };
   
