@@ -132,12 +132,12 @@ namespace dish::builtin
   {
     if(args.size() < 2)
     {
-      fmt::println("unset: too few arguments.");
+      fmt::println(stderr, "unset: too few arguments.");
       return -1;
     }
     else if(args.size() > 2)
     {
-      fmt::println("unset: too many arguments.");
+      fmt::println(stderr, "unset: too many arguments.");
       return -1;
     }
     else
@@ -145,7 +145,7 @@ namespace dish::builtin
       auto it = dish_context.env.find(args[1]);
       if(it == dish_context.env.end())
       {
-        fmt::println("unset: Unknown name.");
+        fmt::println(stderr, "unset: Unknown name.");
         return -1;
       }
       dish_context.env.erase(it);
@@ -166,7 +166,7 @@ namespace dish::builtin
         job_info = job->format_job_info("stopped");
       else
         job_info = job->format_job_info("running");
-      fmt::println( job_info);
+      fmt::println(job_info);
     }
     return 0;
   }
@@ -175,7 +175,7 @@ namespace dish::builtin
     std::shared_ptr<job::Job> job = nullptr;
     if (args.size() > 2)
     {
-      fmt::println("fg: too many arguments.");
+      fmt::println(stderr, "fg: too many arguments.");
       return -1;
     }
     else if (args.size() == 2)
@@ -186,12 +186,12 @@ namespace dish::builtin
         id = std::stoi(args[1]);
       } catch (std::invalid_argument &)
       {
-        fmt::println("fg: invalid argument.");
+        fmt::println(stderr, "fg: invalid argument.");
         return -1;
       }
       if (id - 1 < 0 || id - 1 >= dish_context.jobs.size())
       {
-        fmt::println("fg: invalid job id.");
+        fmt::println(stderr, "fg: invalid job id.");
         return -1;
       }
       job = utils::list_at(dish_context.jobs, id - 1);
@@ -205,7 +205,7 @@ namespace dish::builtin
       }
       if (job == nullptr)
       {
-        fmt::println("fg: no current job");
+        fmt::println(stderr, "fg: no current job");
         return -1;
       }
     }
@@ -223,7 +223,7 @@ namespace dish::builtin
     std::shared_ptr<job::Job> job = nullptr;
     if (args.size() > 2)
     {
-      fmt::println("bg: too many arguments.");
+      fmt::println("stderr, bg: too many arguments.");
       return -1;
     }
     else if (args.size() == 2)
@@ -234,12 +234,12 @@ namespace dish::builtin
         id = std::stoi(args[1]);
       } catch (std::invalid_argument &)
       {
-        fmt::println("bg: invalid argument.");
+        fmt::println("stderr, bg: invalid argument.");
         return -1;
       }
       if (id - 1 < 0 || id - 1 >= dish_context.jobs.size())
       {
-        fmt::println("bg: invalid job id.");
+        fmt::println("stderr, bg: invalid job id.");
         return -1;
       }
       job = utils::list_at(dish_context.jobs, id - 1);
@@ -253,7 +253,7 @@ namespace dish::builtin
       }
       if (job == nullptr)
       {
-        fmt::println("bg: no current job");
+        fmt::println(stderr, "bg: no current job");
         return -1;
       }
     }
@@ -316,7 +316,7 @@ namespace dish::builtin
       list.emplace_back(utils::light_blue(r.first));
     
     fmt::println("{} \n {} \n {}",
-        "Dish - caozhanhao, version 0.0.1-beta.",
+        "Dish - caozhanhao",
         "These are builtin-commands. Use 'help' to see this.",
         fmt::join(list, ", ")
     );
@@ -327,7 +327,7 @@ namespace dish::builtin
   {
     if (args.size() == 1)
     {
-      fmt::println("type: too few arguments.");
+      fmt::println(stderr, "type: too few arguments.");
       return -1;
     }
     for (auto it = args.cbegin() + 1; it != args.cend(); ++it)

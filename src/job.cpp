@@ -96,7 +96,7 @@ namespace dish::job
         }
         auto cargs = get_args();
         execv(cmd_path.c_str(), cargs.data());
-        fmt::println("execv: {}", strerror(errno));
+        fmt::println(stderr, "execv: {}", strerror(errno));
         std::exit(1);
       }
       else
@@ -161,7 +161,7 @@ namespace dish::job
     }
     if (!found)
     {
-      fmt::println("dish: command not found: {}", args[0]);
+      fmt::println(stderr, "dish: command not found: {}", args[0]);
       return -1;
     }
     auto p = std::filesystem::status(path_to_exe).permissions();
@@ -169,7 +169,7 @@ namespace dish::job
          ((p & std::filesystem::perms::group_exec) != std::filesystem::perms::none) ||
          ((p & std::filesystem::perms::others_exec) != std::filesystem::perms::none)))
     {
-      fmt::println("dish: permission denied: {}", args[0]);
+      fmt::println(stderr, "dish: permission denied: {}", args[0]);
       return -1;
     }
     cmd_path = path_to_exe;
@@ -200,7 +200,7 @@ namespace dish::job
       fdin = in.get();
       if (fdin == -1)
       {
-        fmt::println("open/dup: {}", strerror(errno));
+        fmt::println(stderr, "open/dup: {}", strerror(errno));
         return -1;
       }
     }
@@ -209,7 +209,7 @@ namespace dish::job
       fdin = dup(tmpin);
       if (fdin == -1)
       {
-        fmt::println("dup: {}", strerror(errno));
+        fmt::println(stderr, "dup: {}", strerror(errno));
         return -1;
       }
     }
@@ -226,7 +226,7 @@ namespace dish::job
           fdout = out.get();
           if (fdout == -1)
           {
-            fmt::println("open/dup: {}", strerror(errno));
+            fmt::println(stderr, "open/dup: {}", strerror(errno));
             return -1;
           }
         }
@@ -235,7 +235,7 @@ namespace dish::job
           fdout = dup(tmpout);
           if (fdout == -1)
           {
-            fmt::println("dup: {}", strerror(errno));
+            fmt::println(stderr, "dup: {}", strerror(errno));
             return -1;
           }
         }
@@ -245,7 +245,7 @@ namespace dish::job
         int fdpipe[2];
         if (pipe(fdpipe) == -1)
         {
-          fmt::println("pipe: {}", strerror(errno));
+          fmt::println(stderr, "pipe: {}", strerror(errno));
           return -1;
         }
         fdout = fdpipe[1];
@@ -253,12 +253,12 @@ namespace dish::job
       }
       if (dup2(fdout, 1) == -1)
       {
-        fmt::println("dup2: {}", strerror(errno));
+        fmt::println(stderr, "dup2: {}", strerror(errno));
         return -1;
       }
       if (close(fdout) == -1)
       {
-        fmt::println("close: {}", strerror(errno));
+        fmt::println(stderr, "close: {}", strerror(errno));
         return -1;
       }
       scmd.launch();
@@ -266,23 +266,23 @@ namespace dish::job
 
     if (dup2(tmpin, 0) == -1)
     {
-      fmt::println("dup2: {}", strerror(errno));
+      fmt::println(stderr, "dup2: {}", strerror(errno));
       return -1;
     }
     if (dup2(tmpout, 1) == -1)
     {
-      fmt::println("dup2: {}", strerror(errno));
+      fmt::println(stderr, "dup2: {}", strerror(errno));
       return -1;
     }
 
     if (close(tmpin) == -1)
     {
-      fmt::println("close: {}", strerror(errno));
+      fmt::println(stderr, "close: {}", strerror(errno));
       return -1;
     }
     if (close(tmpout) == -1)
     {
-      fmt::println("close: {}", strerror(errno));
+      fmt::println(stderr, "close: {}", strerror(errno));
       return -1;
     }
     if (!dish_context.is_interactive)
@@ -304,7 +304,7 @@ namespace dish::job
     {
       tcsetattr(dish_context.terminal, TCSADRAIN, &job_tmodes);
       if (kill(-cmd_pgid, SIGCONT) < 0)
-        fmt::println("kill (SIGCONT)");
+        fmt::println(stderr, "kill (SIGCONT)");
     }
 
     wait();
@@ -321,7 +321,7 @@ namespace dish::job
     if (cont)
     {
       if (kill(-cmd_pgid, SIGCONT) < 0)
-        fmt::println("kill (SIGCONT): {}", strerror(errno));
+        fmt::println(stderr, "kill (SIGCONT): {}", strerror(errno));
     }
   }
 
@@ -397,7 +397,7 @@ namespace dish::job
           {
             p.completed = true;
             if (WIFSIGNALED(status))
-              fmt::println("{}: Terminated by signal {}.", pid, WTERMSIG(p.status));
+              fmt::println(stderr, "{}: Terminated by signal {}.", pid, WTERMSIG(p.status));
             else if (WIFEXITED(status))
             {
               auto es = WEXITSTATUS(status);
@@ -409,12 +409,12 @@ namespace dish::job
           return 0;
         }
       }
-      fmt::println("mark_status: No such child process {}.", pid);
+      fmt::println(stderr, "mark_status: No such child process {}.", pid);
       return -1;
     }
     else if (pid == 0 || errno == ECHILD)
       return -1;
-    fmt::println("waitpid: {}", strerror(errno));
+    fmt::println(stderr, "waitpid: {}", strerror(errno));
     return -1;
   }
 

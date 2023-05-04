@@ -67,7 +67,7 @@ namespace dish
       auto eq = tmp.find('=');
       if(eq == std::string::npos)
       {
-        fmt::println("Unexpected env: {}", tmp);
+        fmt::println(stderr, "Unexpected env: {}", tmp);
         std::exit(-1);
       }
       dish_context.env[tmp.substr(0, eq)] = tmp.substr(eq + 1);
@@ -95,7 +95,7 @@ namespace dish
       dish_context.pgid = getpid();
       if (setpgid(dish_context.pgid, dish_context.pgid) < 0)
       {
-        fmt::println("DishError: Failed to put the shell in its own process group.");
+        fmt::println(stderr, "DishError: Failed to put the shell in its own process group.");
         //std::exit(1);
       }
       tcsetpgrp(dish_context.terminal, dish_context.pgid);

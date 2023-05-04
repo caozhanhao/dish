@@ -54,7 +54,7 @@ namespace dish::parser
             auto alias = lexer::Lexer(it->second).get_all_tokens_no_check();
             if (!alias.has_value())
             {
-              fmt::println("Failed to parse alias.");
+              fmt::println(stderr, "Failed to parse alias.");
               return -1;
             }
             tokens.insert(tokens.begin() + pos - 1, std::make_move_iterator(alias.value().begin()),

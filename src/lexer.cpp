@@ -36,7 +36,7 @@ namespace dish::lexer
             cmd_state = CmdState::end;
             break;
           default:
-            fmt::println("Syntax Error: Unexpected '{}' at begin.\n{}", token.get_content(),
+            fmt::println(stderr, "Syntax Error: Unexpected '{}' at begin.\n{}", token.get_content(),
                          mark_error_from_token(token));
             return -1;
             break;
@@ -71,7 +71,7 @@ namespace dish::lexer
             cmd_state = CmdState::background;
             break;
           default:
-            fmt::println("Syntax Error: Unexpected '{}' after a command.\n{}", token.get_content(),
+            fmt::println(stderr, "Syntax Error: Unexpected '{}' after a command.\n{}", token.get_content(),
                          mark_error_from_token(token));
             return -1;
             break;
@@ -85,11 +85,11 @@ namespace dish::lexer
             cmd_state = CmdState::word_or_env;
             break;
           case TokenType::end:
-            fmt::println("Syntax Error: Unexpected end.");
+            fmt::println(stderr, "Syntax Error: Unexpected end.");
             return -1;
             break;
           default:
-            fmt::println("Syntax Error: Unexpected '{}' after a pipe.\n{}", token.get_content(),
+            fmt::println(stderr, "Syntax Error: Unexpected '{}' after a pipe.\n{}", token.get_content(),
                          mark_error_from_token(token));
             return -1;
             break;
@@ -106,11 +106,11 @@ namespace dish::lexer
             cmd_state = CmdState::pipe;
             break;
           case TokenType::end:
-            fmt::println("Syntax Error: Unexpected end.");
+            fmt::println(stderr, "Syntax Error: Unexpected end.");
             return -1;
             break;
           default:
-            fmt::println("Syntax Error: Unexpected '{}' after a io_modifier.\n{}", token.get_content(),
+            fmt::println(stderr, "Syntax Error: Unexpected '{}' after a io_modifier.\n{}", token.get_content(),
                          mark_error_from_token(token));
             return -1;
             break;
@@ -126,7 +126,7 @@ namespace dish::lexer
             {
               if(!std::isdigit(r))
               {
-                fmt::println("Syntax Error: Invalid file descriptor.\n{}", token.get_content(),
+                fmt::println(stderr, "Syntax Error: Invalid file descriptor.\n{}", token.get_content(),
                              mark_error_from_token(token));
                 return -1;
               }
@@ -138,11 +138,11 @@ namespace dish::lexer
             cmd_state = CmdState::pipe;
             break;
           case TokenType::end:
-            fmt::println("Syntax Error: Unexpected end.");
+            fmt::println(stderr, "Syntax Error: Unexpected end.");
             return -1;
             break;
           default:
-            fmt::println("Syntax Error: Unexpected '{}' after a io_modifier.\n{}", token.get_content(),
+            fmt::println(stderr, "Syntax Error: Unexpected '{}' after a io_modifier.\n{}", token.get_content(),
                          mark_error_from_token(token));
             return -1;
             break;
@@ -169,7 +169,7 @@ namespace dish::lexer
             cmd_state = CmdState::end;
             break;
           default:
-            fmt::println("Syntax Error: Unexpected '{}' after a filename.\n{}", token.get_content(),
+            fmt::println(stderr, "Syntax Error: Unexpected '{}' after a filename.\n{}", token.get_content(),
                          mark_error_from_token(token));
             return -1;
             break;
@@ -182,14 +182,14 @@ namespace dish::lexer
             cmd_state = CmdState::end;
             break;
           default:
-            fmt::println("Syntax Error", "Unexpected '{}'after a background flag.\n{}", token.get_content(),
+            fmt::println(stderr, "Syntax Error", "Unexpected '{}'after a background flag.\n{}", token.get_content(),
                          mark_error_from_token(token));
             return -1;
             break;
         }
         break;
       case CmdState::end:
-        fmt::println("Syntax Error", "Unexpected '{}'.\n{}", token.get_content(),
+        fmt::println(stderr, "Syntax Error", "Unexpected '{}'.\n{}", token.get_content(),
                      mark_error_from_token(token));
         return -1;
         break;
@@ -282,7 +282,7 @@ namespace dish::lexer
         ++pos;
         if (pos == text.size())
         {
-          fmt::println("Synax Error: Unexpected end of token.");
+          fmt::println(stderr, "Synax Error: Unexpected end of token.");
           return std::nullopt;
         }
         do
@@ -292,7 +292,7 @@ namespace dish::lexer
         } while (pos < text.size() && text[pos] != '}');
         if (pos == text.size() || text[pos] != '}')
         {
-          fmt::println("Synax Error: Unexpected end of token.");
+          fmt::println(stderr, "Synax Error: Unexpected end of token.");
           return std::nullopt;
         }
         pos++;//skip '}'
