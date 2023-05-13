@@ -312,11 +312,14 @@ namespace dish::lexer
     else
     {
       std::string tmp;
+      bool parsing_str = false;
       do
       {
-        tmp += text[pos];
+        if (text[pos] == '"') parsing_str = !parsing_str;
+        else
+          tmp += text[pos];
         ++pos;
-      } while (pos < text.size() && !std::isspace(text[pos]));
+      } while (pos < text.size() && (parsing_str || !std::isspace(text[pos])));
       return Token{TokenType::word, tmp, pos, tmp.size()};
     }
     return Token{TokenType::end, "end", 0, 0};

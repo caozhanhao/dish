@@ -12,10 +12,11 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
+#include "dish/builtin.hpp"
+#include "dish/argsparser.hpp"
+#include "dish/dish.hpp"
 #include "dish/job.hpp"
 #include "dish/utils.hpp"
-#include "dish/dish.hpp"
-#include "dish/builtin.hpp"
 
 #include <unistd.h>
 
@@ -31,12 +32,12 @@ namespace dish::builtin
   {
     if (args.size() > 2)
     {
-      fmt::println("cd: too many arguments.");
+      fmt::println(stderr, "cd: too many arguments.");
       return -1;
     }
     else if(args.size() < 1)
     {
-      fmt::println("cd: too few arguments.");
+      fmt::println(stderr, "cd: too few arguments.");
       return -1;
     }
   
@@ -47,12 +48,12 @@ namespace dish::builtin
       auto home_opt = utils::get_home();
       if (!home_opt.has_value())
       {
-        fmt::println("cd: Can not find ~");
+        fmt::println(stderr, "cd: Can not find ~");
         return -1;
       }
       if (chdir(home_opt.value().c_str()) != 0)
       {
-        fmt::println("cd: {}", strerror(errno));
+        fmt::println(stderr, "cd: {}", strerror(errno));
         return -1;
       }
     }
@@ -62,14 +63,14 @@ namespace dish::builtin
       {
         if (chdir(dish_context.last_dir.c_str()) != 0)
         {
-          fmt::println("cd: {}", strerror(errno));
+          fmt::println(stderr, "cd: {}", strerror(errno));
           return -1;
         }
         dish_context.env["PWD"] = dish_context.last_dir;
       }
       else
       {
-        fmt::println("cd: Invalid '-'.");
+        fmt::println(stderr, "cd: Invalid '-'.");
         return -1;
       }
     }
@@ -77,7 +78,7 @@ namespace dish::builtin
     {
       if (chdir(args[1].c_str()) != 0)
       {
-        fmt::println("cd: {}", strerror(errno));
+        fmt::println(stderr, "cd: {}", strerror(errno));
         return -1;
       }
       dish_context.env["PWD"] = args[1];
@@ -89,7 +90,7 @@ namespace dish::builtin
   {
     if (args.size() != 1)
     {
-      fmt::println("pwd: too many arguments.");
+      fmt::println(stderr, "pwd: too many arguments.");
       return -1;
     }
     else
@@ -223,7 +224,7 @@ namespace dish::builtin
     std::shared_ptr<job::Job> job = nullptr;
     if (args.size() > 2)
     {
-      fmt::println("stderr, bg: too many arguments.");
+      fmt::println(stderr, "bg: too many arguments.");
       return -1;
     }
     else if (args.size() == 2)
@@ -234,12 +235,12 @@ namespace dish::builtin
         id = std::stoi(args[1]);
       } catch (std::invalid_argument &)
       {
-        fmt::println("stderr, bg: invalid argument.");
+        fmt::println(stderr, "bg: invalid argument.");
         return -1;
       }
       if (id - 1 < 0 || id - 1 >= dish_context.jobs.size())
       {
-        fmt::println("stderr, bg: invalid job id.");
+        fmt::println(stderr, "bg: invalid job id.");
         return -1;
       }
       job = utils::list_at(dish_context.jobs, id - 1);
