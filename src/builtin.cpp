@@ -17,6 +17,7 @@
 #include "dish/dish.hpp"
 #include "dish/job.hpp"
 #include "dish/utils.hpp"
+#include "dish/dish_script.hpp"
 
 #include <unistd.h>
 
@@ -355,6 +356,33 @@ namespace dish::builtin
         else
           fmt::println("{} is {}", *it, path);
       }
+    }
+    return 0;
+  }
+  int builtin_dish_run(Args args)
+  {
+    args::ArgsParser args_parser;
+    args_parser.add_description("Run a dish script (currently lua).");
+    args_parser.add_option<std::string>("path", "p")
+            .add_restrictor(args::existing_path())
+            .add_description("Run from path.");
+    args_parser.add_option<std::string>("str", "s")
+            .add_description("Run from string.");
+    args_parser.add_help("help", "h")
+            .add_description("Show this help.");
+    args_parser.parse(args);
+
+    if (auto p = args_parser.get<std::string>("path"); p.has_value())
+    {
+      sol::state lua;
+      lua.open_libraries(sol::lib::base);
+      lua.script_file(p.value(), &script::dish_sol_error_handler);
+    }
+    else if (auto s = args_parser.get<std::string>("str"); s.has_value())
+    {
+      sol::state lua;
+      lua.open_libraries(sol::lib::base);
+      lua.script(s.value(), &script::dish_sol_error_handler);
     }
     return 0;
   }

@@ -16,7 +16,11 @@ Dish
 - job control
 - built-in (cd, pwd, jobs, fg ...)  
 - variable/~/wildcards expansion
+- scripting(currently Lua)
 - To be continued
+
+### Note
+- Dish's script currently uses Lua wrapped by sol
 
 ### Reference
 - [Implementing a Job Control Shell](https://www.gnu.org/software/libc/manual/html_node/Implementing-a-Shell.html)
@@ -26,3 +30,4 @@ Dish
 
 ### Bundled
 - [fmtlib](https://github.com/fmtlib/fmt)
+- [sol2](https://github.com/ThePhD/sol2)

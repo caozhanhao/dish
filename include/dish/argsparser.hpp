@@ -27,6 +27,7 @@
 #include <cstring>
 #include <iostream>
 #include <variant>
+#include <filesystem>
 
 namespace dish::args
 {
@@ -40,7 +41,9 @@ namespace dish::args
         : restrictor(std::move(restrictor_)), description(std::move(description_))
     {}
 
-    Restrictor() = default;
+    Restrictor()
+    : description("default restrictor"), restrictor([](const T &){return true;})
+    {}
 
     bool is_valid(const T &value)
     {
@@ -70,6 +73,14 @@ namespace dish::args
   {
     return {[s](const T &v) -> bool { return std::find(std::cbegin(s), std::cend(s), v) != std::cend(s); },
             fmt::format("one of {}", fmt::join(s, ", "))};
+  }
+
+  Restrictor<std::string> existing_path()
+  {
+    return {[](const std::string &v) -> bool {
+              return std::filesystem::exists(v);
+            },
+            "an existing path"};
   }
 
   Restrictor<std::string> regex(const std::string &pattern)
@@ -309,7 +320,7 @@ namespace dish::args
 
   using ArgsTypeList = TypeList<std::monostate, bool, int, double, std::string>;
   using ArgsType = decltype(as_variant(ArgsTypeList{}));
-  using Restrictors = decltype(as_restrictor_variant(ArgsTypeList{}));
+  using RestrictorVariant = decltype(as_restrictor_variant(ArgsTypeList{}));
 
   std::string get_typename(int index)
   {
@@ -318,7 +329,7 @@ namespace dish::args
     return names[index];
   }
   template<typename T>
-  std::string get_restrictor_description_helper(const Restrictors &restrictors)
+  std::string get_restrictor_description_helper(const RestrictorVariant &restrictors)
   {
     if (restrictors.index() == 0 || restrictors.valueless_by_exception())
       return "";
@@ -327,24 +338,34 @@ namespace dish::args
       return restrictor.description;
     return "";
   }
-  std::string get_restrictor_description(const Restrictors &restrictor)
+  std::string get_restrictor_description(const std::vector<RestrictorVariant> &restrictors)
   {
-    switch (restrictor.index())
+    std::string ret;
+    for (auto &restrictor: restrictors)
     {
-      case index_of_v<bool, ArgsTypeList>:
-        return get_restrictor_description_helper<bool>(restrictor);
-        break;
-      case index_of_v<int, ArgsTypeList>:
-        return get_restrictor_description_helper<int>(restrictor);
-        break;
-      case index_of_v<double, ArgsTypeList>:
-        return get_restrictor_description_helper<double>(restrictor);
-        break;
-      case index_of_v<std::string, ArgsTypeList>:
-        return get_restrictor_description_helper<std::string>(restrictor);
-        break;
+      switch (restrictor.index())
+      {
+        case index_of_v<bool, ArgsTypeList>:
+          ret += get_restrictor_description_helper<bool>(restrictor);
+          break;
+        case index_of_v<int, ArgsTypeList>:
+          ret += get_restrictor_description_helper<int>(restrictor);
+          break;
+        case index_of_v<double, ArgsTypeList>:
+          ret += get_restrictor_description_helper<double>(restrictor);
+          break;
+        case index_of_v<std::string, ArgsTypeList>:
+          ret += get_restrictor_description_helper<std::string>(restrictor);
+          break;
+      }
+      ret += ", ";
     }
-    return "";
+    if (!ret.empty())
+    {
+      ret.pop_back();
+      ret.pop_back();
+    }
+    return ret;
   }
   std::string to_str(const ArgsType &val)
   {
@@ -380,19 +401,19 @@ namespace dish::args
       std::string description;
 
       int expected_type;
-      Restrictors restrictor;
+      std::vector<RestrictorVariant> restrictors;
       ArgsType value;
       ArgsType default_value;
 
 
       std::function<void()> func;
 
-      Option(int expected_type_, Restrictors restrictors_, std::string long_name_, std::string short_name_,
+      Option(int expected_type_, std::vector<RestrictorVariant> restrictors_, std::string long_name_, std::string short_name_,
              ArgsType default_value = std::monostate{})
           : expected_type(expected_type_), short_name(std::move(short_name_)),
             long_name(std::move(long_name_)),
             default_value(std::move(default_value)),
-            restrictor(restrictors_)
+            restrictors(restrictors_)
       {}
 
       Option(std::string long_name_, std::string short_name_,
@@ -425,9 +446,9 @@ namespace dish::args
         description = description_;
         return *this;
       }
-      Option &add_restrictor(const Restrictors &restrictor_)
+      Option &add_restrictor(const RestrictorVariant &restrictor_)
       {
-        restrictor = restrictor_;
+        restrictors.emplace_back(restrictor_);
         return *this;
       }
     };
@@ -443,7 +464,7 @@ namespace dish::args
                        const ArgsType &default_value = std::monostate{})
     {
       static_assert(contains_v<std::decay_t<T>, ArgsTypeList> && !std::is_same_v<std::monostate, T>, "Unsupported Type.");
-      options.emplace_back(Option(index_of_v<std::decay_t<T>, ArgsTypeList>, Restrictor<T>{},
+      options.emplace_back(Option(index_of_v<std::decay_t<T>, ArgsTypeList>, {},
                                   long_name, short_name, default_value));
       long_name_index[long_name] = options.size() - 1;
       if (!short_name.empty())
@@ -451,9 +472,9 @@ namespace dish::args
       return options.back();
     }
 
-    Option &add_option(const std::string &long_name, const std::string &short_name = "")
+    Option &add_boolean_option(const std::string &long_name, const std::string &short_name = "")
     {
-      options.emplace_back(Option(index_of_v<bool, ArgsTypeList>, Restrictor<bool>{},
+      options.emplace_back(Option(index_of_v<bool, ArgsTypeList>, {},
                                   long_name, short_name, true));
       long_name_index[long_name] = options.size() - 1;
       if (!short_name.empty())
@@ -461,7 +482,7 @@ namespace dish::args
       return options.back();
     }
 
-    Option &add_option(const std::string &long_name, const std::string &short_name,
+    Option &add_func_option(const std::string &long_name, const std::string &short_name,
                        const std::function<void()> &func)
     {
       options.emplace_back(Option(long_name, short_name, func));
@@ -480,6 +501,8 @@ namespace dish::args
         fmt::println("options:");
         for (auto &r: long_name_index)
         {
+          //TODO improve '__self' information
+          if(r.first == "__self") continue ;
           auto &opt = options[r.second];
           if (!opt.short_name.empty())
             fmt::print(" -{}, --{} ", opt.short_name, opt.long_name);
@@ -493,15 +516,14 @@ namespace dish::args
             if (opt.expected_type != index_of_v<bool, ArgsTypeList> && opt.default_value.index() == opt.expected_type)
               fmt::print(" = {}", to_str(opt.default_value));
 
-            auto restrictor = get_restrictor_description(opt.restrictor);
+            auto restrictor = get_restrictor_description(opt.restrictors);
             if (restrictor.empty())
               fmt::print("]  ");
             else
               fmt::print(", {}]  ", restrictor);
-
-            if (!opt.description.empty())
-              fmt::println(description);
           }
+          if (!opt.description.empty())
+            fmt::print("  {}", opt.description);
           fmt::print("\n");
         }
       };
@@ -533,11 +555,9 @@ namespace dish::args
       Option *curr = nullptr;
       if (auto it = long_name_index.find("__self"); it != long_name_index.end())
         curr = &options[it->second];
-      else
-        curr = &add_option<std::string>("__self", "");
       for (size_t i = 1; i < args.size(); i++)
       {
-        if(args[i].size() > 1 && args[i][0] == '-')
+        if (args[i].size() > 1 && args[i][0] == '-')
         {
           if (args[i].size() > 2 && args[i][1] == '-')
           {
@@ -605,36 +625,36 @@ namespace dish::args
     }
 
     template<typename T>
-    bool has(const std::string& name)
+    bool has(const std::string &name)
     {
       auto opt = match(name);
-      if(opt == nullptr)
+      if (opt == nullptr)
         return false;
       return opt->has<T>();
     }
 
     template<typename T>
-    std::optional<T> get(const std::string& name)
+    std::optional<T> get(const std::string &name)
     {
       auto opt = match(name);
-      if(opt == nullptr)
+      if (opt == nullptr)
         return std::nullopt;
       return opt->get<T>();
     }
 
   private:
-    Option* match(const std::string& name)
+    Option *match(const std::string &name)
     {
-      Option* opt = nullptr;
+      Option *opt = nullptr;
       auto its = short_name_index.find(name);
       auto itl = long_name_index.find(name);
-      if(name.size() == 1 && its != short_name_index.end())
+      if (name.size() == 1 && its != short_name_index.end())
         opt = &options[its->second];
-      else if(name.size() > 1 && itl != long_name_index.end())
+      else if (name.size() > 1 && itl != long_name_index.end())
         opt = &options[itl->second];
-      else if(itl != long_name_index.end())
+      else if (itl != long_name_index.end())
         opt = &options[itl->second];
-      else if(its != short_name_index.end())
+      else if (its != short_name_index.end())
         opt = &options[its->second];
       return opt;
     }
@@ -644,14 +664,19 @@ namespace dish::args
       auto opt = str_to<T>(s);
       if (opt.has_value())
       {
-        auto restrictor = std::get<Restrictor<T>>(curr->restrictor);
-        if (!restrictor.is_valid(opt.value()))
+        bool pass = true;
+        for (auto &restrictorv: curr->restrictors)
         {
-          fmt::print(stderr, "Warning: Ignored invalid '{}'.", s);
-          if (!restrictor.description.empty())
-            fmt::print(stderr, "(Restriction: {})", restrictor.description);
+          auto restrictor = std::get<Restrictor<T>>(restrictorv);
+          if (!restrictor.is_valid(opt.value()))
+          {
+            fmt::print(stderr, "Warning: Ignored invalid '{}'.", s);
+            if (!restrictor.description.empty())
+              fmt::print(stderr, "(Restriction: {})", restrictor.description);
+            pass = false;
+          }
         }
-        else
+        if (pass)
           curr->value = opt.value();
       }
       else
