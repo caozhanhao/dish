@@ -22,5 +22,7 @@
 namespace dish::script
 {
   sol::protected_function_result dish_sol_error_handler(lua_State* L, sol::protected_function_result pfr);
+
+  sol::state get_dish_state();
 }
 #endif

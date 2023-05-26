@@ -374,13 +374,13 @@ namespace dish::builtin
 
     if (auto p = args_parser.get<std::string>("path"); p.has_value())
     {
-      sol::state lua;
+      auto lua = script::get_dish_state();
       lua.open_libraries(sol::lib::base);
       lua.script_file(p.value(), &script::dish_sol_error_handler);
     }
     else if (auto s = args_parser.get<std::string>("str"); s.has_value())
     {
-      sol::state lua;
+      auto lua = script::get_dish_state();
       lua.open_libraries(sol::lib::base);
       lua.script(s.value(), &script::dish_sol_error_handler);
     }

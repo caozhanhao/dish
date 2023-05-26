@@ -492,7 +492,7 @@ namespace dish::args
       return options.back();
     }
 
-    ArgsParser &add_help(const std::string &long_name, const std::string &short_name)
+    Option &add_help(const std::string &long_name, const std::string &short_name)
     {
       auto help = [this] {
         fmt::println("usage: {} [option] ...", name);
@@ -531,7 +531,7 @@ namespace dish::args
       long_name_index[long_name] = options.size() - 1;
       if (!short_name.empty())
         short_name_index[short_name] = options.size() - 1;
-      return *this;
+      return options.back();
     }
 
     ArgsParser &add_description(const std::string &description_)

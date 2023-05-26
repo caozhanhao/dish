@@ -17,34 +17,43 @@
 
 namespace dish::script
 {
-  sol::protected_function_result dish_sol_error_handler(lua_State* L, sol::protected_function_result pfr)
+  sol::protected_function_result dish_sol_error_handler(lua_State *L, sol::protected_function_result pfr)
   {
-      std::exception_ptr eptr = std::current_exception();
-      std::string errmsg;
-      if (eptr) {
-        try {
-          std::rethrow_exception(eptr);
-        } catch (const std::exception &ex) {
-          errmsg += "std::exception -- ";
-          errmsg.append(ex.what());
-        } catch (const std::string &message) {
-          errmsg += "message -- ";
-          errmsg.append(message);
-        } catch (const char *message) {
-          errmsg += "message -- ";
-          errmsg.append(message);
-        } catch (...) {
-          errmsg.append("unknown type, cannot serialize into error message");
-        }
+    std::exception_ptr eptr = std::current_exception();
+    std::string errmsg;
+    if (eptr) {
+      try {
+        std::rethrow_exception(eptr);
+      } catch (const std::exception &ex) {
+        errmsg += "std::exception -- ";
+        errmsg.append(ex.what());
+      } catch (const std::string &message) {
+        errmsg += "message -- ";
+        errmsg.append(message);
+      } catch (const char *message) {
+        errmsg += "message -- ";
+        errmsg.append(message);
+      } catch (...) {
+        errmsg.append("unknown type, cannot serialize into error message");
       }
-      if (sol::type_of(L, pfr.stack_index()) == sol::type::string)
-      {
-        std::string_view serr = sol::stack::unqualified_get<std::string_view>(L, pfr.stack_index());
-        errmsg.append(serr.data(), serr.size());
-      }
+    }
+    if (sol::type_of(L, pfr.stack_index()) == sol::type::string)
+    {
+      std::string_view serr = sol::stack::unqualified_get<std::string_view>(L, pfr.stack_index());
+      errmsg.append(serr.data(), serr.size());
+    }
 
-      fmt::println(stderr, "Dish Script (currently Lua) Error:\n{} error:\n{}",
-                   sol::to_string(pfr.status()), errmsg);
-      return script_pass_on_error(L, std::move(pfr));
+    fmt::println(stderr, "Dish Script (currently Lua) Error:\n{} error:\n{}",
+                 sol::to_string(pfr.status()), errmsg);
+    return script_pass_on_error(L, std::move(pfr));
+  }
+
+  sol::state get_dish_state()
+  {
+    sol::state lua;
+    lua["dish_env"] = lua.create_table();
+    for (auto &r: dish_context.env)
+      lua["dish_env"][r.first] = r.second;
+    return lua;
   }
 }
