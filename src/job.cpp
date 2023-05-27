@@ -67,13 +67,21 @@ namespace dish::job
   void Process::launch()
   {
     int childpid = 0;
-    if (builtin::builtins.find(args[0]) != builtin::builtins.end())
+    if (type == ProcessType::builtin)
     {
-      dish_context.last_foreground_ret = builtin::builtins.at(args[0])(args);
+      dish_context.lua_state["dish"]["last_foreground_ret"] = builtin::builtins.at(args[0])(args);
       completed = true;
       do_job_notification();
     }
-    else
+    else if(type == ProcessType::lua_func)
+    {
+      std::string script = fmt::format("print(dish.func.{}({}))", args[0],
+                                       fmt::join(args.begin() + 1, args.end(), ", "));
+      dish_context.lua_state.script(script, &script::dish_sol_error_handler);
+      completed = true;
+      do_job_notification();
+    }
+    else if(type == ProcessType::path_to_exe)
     {
       childpid = fork();
       if (childpid == 0)
@@ -110,6 +118,8 @@ namespace dish::job
         }
       }
     }
+    else
+      fmt::println(stderr, "Unknown process.");
   }
 
   void Process::insert(std::string str)
@@ -145,9 +155,16 @@ namespace dish::job
 
     if(builtin::builtins.find(args[0]) != builtin::builtins.end())
     {
-      is_builtin = true;
+      type = ProcessType::builtin;
       return 0;
     }
+
+    if(dish_context.lua_state["dish"]["func"][args[0]].valid())
+    {
+      type = ProcessType::lua_func;
+      return 0;
+    }
+
     bool found = false;
     std::string path_to_exe;
     for (auto path: get_path())
@@ -173,6 +190,7 @@ namespace dish::job
       return -1;
     }
     cmd_path = path_to_exe;
+    type = ProcessType::path_to_exe;
     return 0;
   }
 
@@ -372,11 +390,11 @@ namespace dish::job
     return true;
   }
 
-  bool Job::is_builtin()
+  bool Job::is_builtin_or_lua()
   {
     for (auto &p: processes)
     {
-      if (!p.is_builtin)
+      if (p.type != ProcessType::builtin && p.type != ProcessType::lua_func)
         return false;
     }
     return true;
@@ -403,7 +421,7 @@ namespace dish::job
               auto es = WEXITSTATUS(status);
               p.exit_status = es;
               if (!is_background())
-                dish_context.last_foreground_ret = es;
+                dish_context.lua_state["dish"]["last_foreground_ret"] = es;
             }
           }
           return 0;
@@ -420,7 +438,7 @@ namespace dish::job
 
   void Job::wait()
   {
-    if (!is_builtin())
+    if (!is_builtin_or_lua())
     {
       int status;
       pid_t pid;
@@ -435,7 +453,7 @@ namespace dish::job
 
   void Job::update_status()
   {
-    if(!is_builtin())
+    if(!is_builtin_or_lua())
     {
       int status;
       pid_t pid;

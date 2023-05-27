@@ -79,8 +79,8 @@ namespace dish::utils
   
   static std::string get_dish_env(const std::string &s)
   {
-    if(auto it = dish_context.env.find(s); it != dish_context.env.end())
-      return it->second;
+    if(auto it = dish_context.lua_state["dish"]["environment"][s]; it.valid())
+      return it.get<std::string>();
     return "";
   }
   static bool has_wildcards(const std::string &s)
@@ -95,9 +95,9 @@ namespace dish::utils
     const std::vector<std::string> env_to_find{"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"};
     for(auto& r : env_to_find)
     {
-      if(auto it = dish_context.env.find(r); it != dish_context.env.end())
+      if(auto it = dish_context.lua_state["dish"]["environment"][r]; it.valid())
       {
-        home = it->second;
+        home = it.get<std::string>();
         break;
       }
     }

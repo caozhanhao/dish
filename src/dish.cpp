@@ -48,17 +48,22 @@ namespace dish
 
   void init()
   {
-    dish_context.last_foreground_ret = 0;
-    dish_context.last_dir = "/";
-    dish_context.waiting = false;
+    dish_context.lua_state.open_libraries(sol::lib::base, sol::lib::string,
+                                          sol::lib::coroutine, sol::lib::os,
+                                          sol::lib::io, sol::lib::math,
+                                          sol::lib::table, sol::lib::bit32);
+    dish_context.lua_state.set_exception_handler(script::dish_sol_exception_handler);
+    dish_context.lua_state["dish"] = dish_context.lua_state.create_table();
+    dish_context.lua_state["dish"]["history"] = dish_context.lua_state.create_table();
+    dish_context.lua_state["dish"]["environment"] = dish_context.lua_state.create_table();
+    dish_context.lua_state["dish"]["alias"] = dish_context.lua_state.create_table();
+    dish_context.lua_state["dish"]["func"] = dish_context.lua_state.create_table();
+    dish_context.lua_state["dish"]["last_foreground_ret"] = sol::nil;
+    dish_context.lua_state["dish"]["last_dir"] = utils::get_home();
 
+    dish_context.waiting = false;
     dish_context.terminal = STDIN_FILENO;
     dish_context.is_interactive = isatty(dish_context.terminal);
-
-    dish_context.alias = {
-            {"ls", "ls --color=tty"},
-            {"grep", "grep --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn,.idea,.tox}"}
-    };
 
     char ** envir = environ;
     while(*envir)
@@ -70,15 +75,21 @@ namespace dish
         fmt::println(stderr, "Unexpected env: {}", tmp);
         std::exit(-1);
       }
-      dish_context.env[tmp.substr(0, eq)] = tmp.substr(eq + 1);
+      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq)]
+              = tmp.substr(eq + 1);
       envir++;
     }
 
-    dish_context.env["PWD"] = std::filesystem::current_path().string();
-    dish_context.env["HOME"] = getpwuid(getuid())->pw_dir;
+    dish_context.lua_state["dish"]["environment"]["PWD"]
+            = std::filesystem::current_path().string();
+    dish_context.lua_state["dish"]["environment"]["HOME"] = getpwuid(getuid())->pw_dir;
 
-    if(dish_context.env.find("PATH") == dish_context.env.end())
-      dish_context.env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+    if(!dish_context.lua_state["dish"]["environment"]["PATH"].valid())
+    {
+      dish_context.lua_state["dish"]["environment"]["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+    }
+
+    dish_context.lua_state.script_file("../src/dishrc.lua");
 
     if (dish_context.is_interactive)
     {
@@ -105,7 +116,7 @@ namespace dish
   
   void run(const std::string &cmd)
   {
-    dish_context.history.emplace_back(cmd);
+    dish_context.lua_state["dish"]["history"].get<sol::table>().add(cmd);
     lexer::Lexer lexer{cmd};
     auto tokens = lexer.get_all_tokens();
     if (!tokens.has_value()) return;
@@ -143,8 +154,8 @@ namespace dish
   std::vector<std::string> get_path(bool with_curr)
   {
     std::vector<std::string> ret;
-    if(auto it = dish_context.env.find("PATH"); it != dish_context.env.end())
-      ret = utils::split<std::vector<std::string>>(it->second, ":");
+    if(auto p = dish_context.lua_state["dish"]["environment"]["PATH"]; p.valid())
+      ret = utils::split<std::vector<std::string>>(p.get<std::string>(), ":");
     if(with_curr)
       ret.emplace_back(std::filesystem::current_path().string());
     return ret;
@@ -158,11 +169,13 @@ namespace dish
       char hostname[256];
       gethostname(hostname, sizeof(hostname));
       auto uid = getuid();
+      int last_ret = 0;
+      if(dish_context.lua_state["last_foreground_ret"].is<int>()) last_ret = dish_context.lua_state["last_foreground_ret"];
       fmt::print("\n> Dish {}@{}:{} {} \n{} ",
                  utils::blue(getpwuid(uid)->pw_name),
                  utils::green(hostname),
                  utils::yellow(utils::simplify_path(std::filesystem::current_path().string())),
-                 dish_context.last_foreground_ret == 0 ? "" : utils::red("C: " + std::to_string(dish_context.last_foreground_ret)),
+                 last_ret == 0 ? "" : utils::red("C: " + std::to_string(last_ret)),
                  utils::red(uid == 0 ? "#" : "$"));
 
       std::cin.clear();

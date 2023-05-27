@@ -55,7 +55,12 @@ namespace dish::job
   };
   
   class Job;
-  
+
+  enum class ProcessType
+  {
+    unknown, builtin, lua_func, path_to_exe
+  };
+
   class Process
   {
     friend class Job;
@@ -64,7 +69,7 @@ namespace dish::job
     std::vector<std::string> args;
     std::string cmd_path;
   public:
-    bool is_builtin;
+    ProcessType type;
     int pid;
     int status;
     int exit_status;
@@ -73,7 +78,7 @@ namespace dish::job
   public:
     Process()
         : pid(-1), status(-1), completed(false),
-          stopped(false), exit_status(-1), is_builtin(false), job_context(nullptr){}
+          stopped(false), exit_status(-1), type(ProcessType::unknown), job_context(nullptr){}
 
     void launch();
     
@@ -132,7 +137,7 @@ namespace dish::job
 
     bool is_completed();
 
-    bool is_builtin();
+    bool is_builtin_or_lua();
 
     void wait();
 

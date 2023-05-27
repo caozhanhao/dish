@@ -54,11 +54,11 @@ namespace dish::parser
           // alias
           if (scmd.empty())
           {
-            auto it = dish_context.alias.find(content);
-            if (it != dish_context.alias.end())
+            auto it = dish_context.lua_state["dish"]["alias"][content];
+            if (it.valid())
             {
               tokens.erase(tokens.begin() + pos - 1);
-              auto alias = lexer::Lexer(it->second).get_all_tokens_no_check();
+              auto alias = lexer::Lexer(it.get<std::string>()).get_all_tokens_no_check();
               if (!alias.has_value())
               {
                 fmt::println(stderr, "Failed to parse alias.");

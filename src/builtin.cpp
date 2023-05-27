@@ -60,14 +60,15 @@ namespace dish::builtin
     }
     else if(args[1] == "-")
     {
-      if(!dish_context.last_dir.empty())
+      if(dish_context.lua_state["dish"]["last_dir"].valid())
       {
-        if (chdir(dish_context.last_dir.c_str()) != 0)
+        if (chdir(dish_context.lua_state["dish"]["last_dir"].get<const char*>()) != 0)
         {
           fmt::println(stderr, "cd: {}", strerror(errno));
           return -1;
         }
-        dish_context.env["PWD"] = dish_context.last_dir;
+        dish_context.lua_state["dish"]["environment"]["PWD"]
+        = dish_context.lua_state["dish"]["last_dir"];
       }
       else
       {
@@ -82,9 +83,9 @@ namespace dish::builtin
         fmt::println(stderr, "cd: {}", strerror(errno));
         return -1;
       }
-      dish_context.env["PWD"] = args[1];
+      dish_context.lua_state["dish"]["environment"]["PWD"] = args[1];
     }
-    dish_context.last_dir = last_dir;
+    dish_context.lua_state["dish"]["last_dir"] = last_dir;
     return 0;
   }
   int builtin_pwd(Args args)
@@ -96,12 +97,12 @@ namespace dish::builtin
     }
     else
     {
-      if(auto it = dish_context.env.find("PWD"); it != dish_context.env.end())
-        fmt::println(it->second);
+      if(auto s = dish_context.lua_state["dish"]["environment"]["PWD"]; s.valid())
+        fmt::println(s.get<std::string>());
       else
       {
         auto path = std::filesystem::current_path().string();
-        dish_context.env["PWD"] = path;
+        dish_context.lua_state["dish"]["environment"]["PWD"] = path;
         fmt::println(path);
       }
     }
@@ -112,7 +113,8 @@ namespace dish::builtin
   {
     if(args.size() == 1)
     {
-      for(auto& r : dish_context.env)
+      for(auto& r : dish_context.lua_state["dish"]["environment"]
+                            .get<std::map<std::string, std::string>>())
         fmt::println("{}={}", r.first, r.second);
     }
     else if(args.size() == 2)
@@ -122,10 +124,10 @@ namespace dish::builtin
       {
         auto name = args[1].substr(0, eq);
         auto value = args[1].substr(eq + 1);
-        dish_context.env[name] = value;
+        dish_context.lua_state["dish"]["environment"][name] = value;
       }
       else
-        dish_context.env[args[1]] = "";
+        dish_context.lua_state["dish"]["environment"][args[1]] = "";
     }
     return 0;
   }
@@ -144,13 +146,13 @@ namespace dish::builtin
     }
     else
     {
-      auto it = dish_context.env.find(args[1]);
-      if(it == dish_context.env.end())
+      auto it = dish_context.lua_state["dish"]["environment"][args[1]];
+      if(!it.valid())
       {
         fmt::println(stderr, "unset: Unknown name.");
         return -1;
       }
-      dish_context.env.erase(it);
+      it = sol::nil;
     }
     return 0;
   }
@@ -278,7 +280,8 @@ namespace dish::builtin
   {
     if(args.size() == 1)
     {
-      for(auto& r : dish_context.alias)
+      for(auto& r : dish_context.lua_state["dish"]["alias"]
+                            .get<std::map<std::string, std::string>>())
         fmt::println("{}={}", r.first, r.second);
     }
     else if(args.size() == 2)
@@ -288,13 +291,13 @@ namespace dish::builtin
       {
         auto name = args[1].substr(0, eq);
         auto alias = args[1].substr(eq + 1);
-        dish_context.alias[name] = alias;
+        dish_context.lua_state["dish"]["alias"][name] = alias;
       }
       else
       {
-        auto it = dish_context.alias.find(args[1]);
-        if (it != dish_context.alias.end())
-          fmt::println("{}={}", it->first, it->second);
+        auto it = dish_context.lua_state["dish"]["alias"][args[1]];
+        if (it.valid())
+          fmt::println("{}={}", args[1], it.get<std::string>());
       }
     }
     return 0;
@@ -303,7 +306,7 @@ namespace dish::builtin
   int builtin_history(Args args)
   {
     int index = 1;
-    for (auto &r : dish_context.history)
+    for (auto &r : dish_context.lua_state["dish"]["history"].get<std::vector<std::string>>())
     {
       fmt::println("{}| {}", index, r);
       index++;
@@ -334,10 +337,12 @@ namespace dish::builtin
     }
     for (auto it = args.cbegin() + 1; it != args.cend(); ++it)
     {
-      if (auto alias = dish_context.alias.find(*it); alias != dish_context.alias.end())
-        fmt::println("{} is an alias for {}", *it, alias->second);
+      if (auto alias = dish_context.lua_state["dish"]["alias"][*it]; alias.valid())
+        fmt::println("{} is an alias for {}", *it, alias.get<std::string>());
       else if(builtins.find(*it) != builtins.end())
-        fmt::println("{} is a shell builtin", *it, alias->second);
+        fmt::println("{} is a shell builtin", *it);
+      else if(dish_context.lua_state["dish"]["func"][*it].valid())
+        fmt::println("{} is a lua function", *it);
       else
       {
         bool found = false;
@@ -373,17 +378,9 @@ namespace dish::builtin
     args_parser.parse(args);
 
     if (auto p = args_parser.get<std::string>("path"); p.has_value())
-    {
-      auto lua = script::get_dish_state();
-      lua.open_libraries(sol::lib::base);
-      lua.script_file(p.value(), &script::dish_sol_error_handler);
-    }
+      dish_context.lua_state.script_file(p.value(), &script::dish_sol_error_handler);
     else if (auto s = args_parser.get<std::string>("str"); s.has_value())
-    {
-      auto lua = script::get_dish_state();
-      lua.open_libraries(sol::lib::base);
-      lua.script(s.value(), &script::dish_sol_error_handler);
-    }
+      dish_context.lua_state.script(s.value(), &script::dish_sol_error_handler);
     return 0;
   }
 }

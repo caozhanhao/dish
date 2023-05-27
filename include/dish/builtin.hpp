@@ -15,6 +15,8 @@
 #define DISH_BUILTIN_HPP
 #pragma once
 
+#include "dish_script.hpp"
+
 #include <vector>
 #include <string>
 #include <functional>
@@ -50,6 +52,8 @@ namespace dish::builtin
   int builtin_type(Args);
 
   int builtin_dish_run(Args);
+
+  int builtin_add_builtin(Args);
 
   static const std::map<std::string, Func> builtins{
           {"cd", builtin_cd},

@@ -12,6 +12,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
+#include "dish/dish.hpp"
 #include "dish/utils.hpp"
 #include "dish/dish_script.hpp"
 
@@ -43,17 +44,24 @@ namespace dish::script
       errmsg.append(serr.data(), serr.size());
     }
 
-    fmt::println(stderr, "Dish Script (currently Lua) Error:\n{} error:\n{}",
+    fmt::println(stderr, "Dish Lua Error:\n{} error:\n{}",
                  sol::to_string(pfr.status()), errmsg);
     return script_pass_on_error(L, std::move(pfr));
   }
-
-  sol::state get_dish_state()
+  int dish_sol_exception_handler(lua_State* L, sol::optional<const std::exception&> maybe_exception, sol::string_view description)
   {
-    sol::state lua;
-    lua["dish_env"] = lua.create_table();
-    for (auto &r: dish_context.env)
-      lua["dish_env"][r.first] = r.second;
-    return lua;
+    fmt::println(stderr, "An exception occurred in a function ");
+    if (maybe_exception)
+    {
+      const std::exception& ex = *maybe_exception;
+      fmt::println(stderr, "(straight from the exception):\n{}", ex.what());
+    }
+    else
+    {
+      fmt::println(stderr, "(from the description parameter):");
+      std::cerr.write(description.data(), static_cast<std::streamsize>(description.size()));
+      fmt::print("\n");
+    }
+    return sol::stack::push(L, description);
   }
 }

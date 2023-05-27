@@ -15,6 +15,8 @@
 #define DISH_DISH_HPP
 #pragma once
 
+#include "dish_script.hpp"
+
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
@@ -32,11 +34,8 @@ namespace dish
 
   struct DishContext
   {
-    int last_foreground_ret;
-    std::string last_dir;
-    std::map<std::string, std::string> alias;
-    std::map<std::string,std::string> env;
-    std::list<std::string> history;
+    sol::state lua_state;
+
     std::list<std::shared_ptr<job::Job>> jobs;
 
     pid_t pgid;
