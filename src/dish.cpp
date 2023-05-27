@@ -60,6 +60,7 @@ namespace dish
     dish_context.lua_state["dish"]["func"] = dish_context.lua_state.create_table();
     dish_context.lua_state["dish"]["last_foreground_ret"] = sol::nil;
     dish_context.lua_state["dish"]["last_dir"] = utils::get_home();
+    dish_context.lua_state["dish"]["prompt"] = [] { fmt::print("\n{} ",utils::red(getuid() == 0 ? "#" : "$"));};
 
     dish_context.waiting = false;
     dish_context.terminal = STDIN_FILENO;
@@ -83,6 +84,7 @@ namespace dish
     dish_context.lua_state["dish"]["environment"]["PWD"]
             = std::filesystem::current_path().string();
     dish_context.lua_state["dish"]["environment"]["HOME"] = getpwuid(getuid())->pw_dir;
+    dish_context.lua_state["dish"]["environment"]["UID"] = getuid();
 
     if(!dish_context.lua_state["dish"]["environment"]["PATH"].valid())
     {
@@ -166,18 +168,7 @@ namespace dish
     while (true)
     {
       std::string cmd;
-      char hostname[256];
-      gethostname(hostname, sizeof(hostname));
-      auto uid = getuid();
-      int last_ret = 0;
-      if(dish_context.lua_state["last_foreground_ret"].is<int>()) last_ret = dish_context.lua_state["last_foreground_ret"];
-      fmt::print("\n> Dish {}@{}:{} {} \n{} ",
-                 utils::blue(getpwuid(uid)->pw_name),
-                 utils::green(hostname),
-                 utils::yellow(utils::simplify_path(std::filesystem::current_path().string())),
-                 last_ret == 0 ? "" : utils::red("C: " + std::to_string(last_ret)),
-                 utils::red(uid == 0 ? "#" : "$"));
-
+      dish_context.lua_state["dish"]["prompt"]();
       std::cin.clear();
       std::getline(std::cin, cmd);
       if (!cmd.empty())
