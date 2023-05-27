@@ -83,7 +83,7 @@ namespace dish::builtin
         fmt::println(stderr, "cd: {}", strerror(errno));
         return -1;
       }
-      dish_context.lua_state["dish"]["environment"]["PWD"] = args[1];
+      dish_context.lua_state["dish"]["environment"]["PWD"] = std::filesystem::current_path().string();
     }
     dish_context.lua_state["dish"]["last_dir"] = last_dir;
     return 0;
@@ -113,9 +113,8 @@ namespace dish::builtin
   {
     if(args.size() == 1)
     {
-      for(auto& r : dish_context.lua_state["dish"]["environment"]
-                            .get<std::map<std::string, std::string>>())
-        fmt::println("{}={}", r.first, r.second);
+      for (auto &r: dish_context.lua_state["dish"]["environment"].get<sol::table>())
+        fmt::println("{}={}", r.first.as<std::string>(), r.second.as<std::string>());
     }
     else if(args.size() == 2)
     {
@@ -280,9 +279,8 @@ namespace dish::builtin
   {
     if(args.size() == 1)
     {
-      for(auto& r : dish_context.lua_state["dish"]["alias"]
-                            .get<std::map<std::string, std::string>>())
-        fmt::println("{}={}", r.first, r.second);
+      for(auto& r : dish_context.lua_state["dish"]["alias"].get<sol::table>())
+        fmt::println("{}={}", r.first.as<std::string>(), r.second.as<std::string>());
     }
     else if(args.size() == 2)
     {
@@ -305,11 +303,9 @@ namespace dish::builtin
 
   int builtin_history(Args args)
   {
-    int index = 1;
-    for (auto &r : dish_context.lua_state["dish"]["history"].get<std::vector<std::string>>())
+    for (auto &r : dish_context.lua_state["dish"]["history"].get<sol::table>())
     {
-      fmt::println("{}| {}", index, r);
-      index++;
+      fmt::println("{}| {}", r.first.as<int>(), r.second.as<std::string>());
     }
     return 0;
   }
@@ -364,10 +360,12 @@ namespace dish::builtin
     }
     return 0;
   }
-  int builtin_dish_run(Args args)
+  int builtin_source(Args args)
   {
     args::ArgsParser args_parser;
     args_parser.add_description("Run a dish script (currently lua).");
+    args_parser.add_option<std::string>("__self", "")
+            .add_restrictor(args::existing_path());
     args_parser.add_option<std::string>("path", "p")
             .add_restrictor(args::existing_path())
             .add_description("Run from path.");
@@ -379,6 +377,8 @@ namespace dish::builtin
 
     if (auto p = args_parser.get<std::string>("path"); p.has_value())
       dish_context.lua_state.script_file(p.value(), &script::dish_sol_error_handler);
+    else if(auto sp = args_parser.get<std::string>("__self"); sp.has_value())
+      dish_context.lua_state.script_file(sp.value(), &script::dish_sol_error_handler);
     else if (auto s = args_parser.get<std::string>("str"); s.has_value())
       dish_context.lua_state.script(s.value(), &script::dish_sol_error_handler);
     return 0;

@@ -83,8 +83,9 @@ namespace dish
 
     dish_context.lua_state["dish"]["environment"]["PWD"]
             = std::filesystem::current_path().string();
+    dish_context.lua_state["dish"]["environment"]["USERNAME"] = getpwuid(getuid())->pw_name;
     dish_context.lua_state["dish"]["environment"]["HOME"] = getpwuid(getuid())->pw_dir;
-    dish_context.lua_state["dish"]["environment"]["UID"] = getuid();
+    dish_context.lua_state["dish"]["environment"]["UID"] = std::to_string(getuid());
 
     if(!dish_context.lua_state["dish"]["environment"]["PATH"].valid())
     {

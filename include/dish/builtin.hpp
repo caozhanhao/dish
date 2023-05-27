@@ -51,7 +51,7 @@ namespace dish::builtin
 
   int builtin_type(Args);
 
-  int builtin_dish_run(Args);
+  int builtin_source(Args);
 
   int builtin_add_builtin(Args);
 
@@ -68,7 +68,7 @@ namespace dish::builtin
           {"bg", builtin_bg},
           {"alias", builtin_alias},
           {"type", builtin_type},
-          {"dish_run", builtin_dish_run}
+          {"source", builtin_source}
   };
 }
 #endif

@@ -672,7 +672,9 @@ namespace dish::args
           {
             fmt::print(stderr, "Warning: Ignored invalid '{}'.", s);
             if (!restrictor.description.empty())
-              fmt::print(stderr, "(Restriction: {})", restrictor.description);
+              fmt::print(stderr, "(Restriction: {})\n", restrictor.description);
+            else
+              fmt::print(stderr, "\n");
             pass = false;
           }
         }
