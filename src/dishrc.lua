@@ -4,13 +4,13 @@ dish.alias = {
 }
 
 function prompt()
-    io.write(string.format("\n[1;34m#[0m [1;36m%s[0m in [1;33m%s[0m\n",
-            dish.environment.USERNAME, dish.environment.PWD))
+    p = string.format("\n[1;34m#[0m [36m%s[0m in [1;33m%s[0m [%s]\n",
+            dish.environment.USERNAME, dish.environment.PWD, os.date("%H:%M:%S",os.time()))
     if(dish.environment.UID == "0") then
-        io.write("[1;31m# [0m")
+        return p .. "[1;31m# [0m"
     else
-        io.write("[1;31m$ [0m")
+        return p .. "[1;31m$ [0m"
     end
 end
 
-dish.prompt = prompt;
+dish.prompt = prompt

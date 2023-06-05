@@ -77,7 +77,7 @@ namespace dish::job
     {
       std::string script = fmt::format("print(dish.func.{}({}))", args[0],
                                        fmt::join(args.begin() + 1, args.end(), ", "));
-      dish_context.lua_state.script(script, &script::dish_sol_error_handler);
+      dish_context.lua_state.script(script, &lua::dish_sol_error_handler);
       completed = true;
       do_job_notification();
     }

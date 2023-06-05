@@ -15,7 +15,7 @@
 #define DISH_DISH_HPP
 #pragma once
 
-#include "dish_script.hpp"
+#include "dish_lua.hpp"
 
 #include <sys/types.h>
 #include <termios.h>
@@ -34,6 +34,7 @@ namespace dish
 
   struct DishContext
   {
+    bool running;
     sol::state lua_state;
 
     std::list<std::shared_ptr<job::Job>> jobs;
@@ -48,9 +49,9 @@ namespace dish
 
   extern DishContext dish_context;
 
-  extern void init();
+  extern void dish_init();
   
-  extern void run(const std::string &cmd);
+  extern void run_command(const std::string &cmd);
   
   [[noreturn]] extern void loop();
   
@@ -59,5 +60,6 @@ namespace dish
   extern void do_job_notification();
 
   extern std::vector<std::string> get_path(bool with_curr = true);
+  extern std::string dish_default_prompt();
 }
 #endif

@@ -13,11 +13,12 @@
 //   limitations under the License.
 
 #include "dish/builtin.hpp"
-#include "dish/argsparser.hpp"
+#include "dish/args_parser.hpp"
 #include "dish/dish.hpp"
+#include "dish/dish_lua.hpp"
 #include "dish/job.hpp"
 #include "dish/utils.hpp"
-#include "dish/dish_script.hpp"
+#include "dish/line_editor.hpp"
 
 #include <unistd.h>
 
@@ -271,7 +272,7 @@ namespace dish::builtin
   
   int builtin_exit(Args)
   {
-    std::exit(0);
+    dish_context.running = false;
     return 0;
   }
 
@@ -303,9 +304,10 @@ namespace dish::builtin
 
   int builtin_history(Args args)
   {
-    for (auto &r : dish_context.lua_state["dish"]["history"].get<sol::table>())
+    int i = 1;
+    for (auto &r : line_editor::dle_context.history)
     {
-      fmt::println("{}| {}", r.first.as<int>(), r.second.as<std::string>());
+      fmt::println("{}| {}", i++, r.cmd);
     }
     return 0;
   }
@@ -376,11 +378,11 @@ namespace dish::builtin
     args_parser.parse(args);
 
     if (auto p = args_parser.get<std::string>("path"); p.has_value())
-      dish_context.lua_state.script_file(p.value(), &script::dish_sol_error_handler);
+      dish_context.lua_state.script_file(p.value(), &lua::dish_sol_error_handler);
     else if(auto sp = args_parser.get<std::string>("__self"); sp.has_value())
-      dish_context.lua_state.script_file(sp.value(), &script::dish_sol_error_handler);
+      dish_context.lua_state.script_file(sp.value(), &lua::dish_sol_error_handler);
     else if (auto s = args_parser.get<std::string>("str"); s.has_value())
-      dish_context.lua_state.script(s.value(), &script::dish_sol_error_handler);
+      dish_context.lua_state.script(s.value(), &lua::dish_sol_error_handler);
     return 0;
   }
 }

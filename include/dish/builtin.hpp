@@ -15,7 +15,7 @@
 #define DISH_BUILTIN_HPP
 #pragma once
 
-#include "dish_script.hpp"
+#include "dish_lua.hpp"
 
 #include <vector>
 #include <string>

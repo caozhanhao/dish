@@ -26,6 +26,7 @@
 
 #include <vector>
 #include <optional>
+#include <chrono>
 #include <list>
 #include <algorithm>
 #include <string>
@@ -225,6 +226,16 @@ static std::string simplify_path(const std::string &path)
     auto it = list.begin();
     std::advance(it, index);
     return *it;
+  }
+
+  static std::string get_timestamp()
+  {
+    auto tp = std::chrono::time_point_cast<std::chrono::milliseconds>
+            (std::chrono::system_clock::now());
+    return std::to_string
+            (std::chrono::duration_cast<std::chrono::milliseconds>
+                                           (tp.time_since_epoch()).count());
+
   }
 }
 #endif

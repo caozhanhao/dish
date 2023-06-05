@@ -11,17 +11,15 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_DISH_SCRIPT_HPP
-#define DISH_DISH_SCRIPT_HPP
+#ifndef DISH_DISH_LUA_HPP
+#define DISH_DISH_LUA_HPP
 #pragma once
-
-// Dish's script currently uses lua wrapped by sol
 
 #include "bundled/sol/sol.hpp"
 
-namespace dish::script
+namespace dish::lua
 {
-  sol::protected_function_result dish_sol_error_handler(lua_State* L, sol::protected_function_result pfr);
-  int dish_sol_exception_handler(lua_State* L, sol::optional<const std::exception&> maybe_exception, sol::string_view description);
+  extern sol::protected_function_result dish_sol_error_handler(lua_State* L, sol::protected_function_result pfr);
+  extern int dish_sol_exception_handler(lua_State* L, sol::optional<const std::exception&> maybe_exception, sol::string_view description);
 }
 #endif

@@ -42,52 +42,56 @@ namespace dish
   }
   void sigchld_handler(int sig)
   {
-    if(!dish_context.waiting)
+    if (!dish_context.waiting)
       do_job_notification();
   }
 
-  void init()
+  std::string dish_default_prompt()
   {
+    return (getuid() == 0 ? "#" : "$");
+  }
+
+  void dish_init()
+  {
+    dish_context.running = true;
     dish_context.lua_state.open_libraries(sol::lib::base, sol::lib::string,
                                           sol::lib::coroutine, sol::lib::os,
                                           sol::lib::io, sol::lib::math,
                                           sol::lib::table, sol::lib::bit32);
-    dish_context.lua_state.set_exception_handler(script::dish_sol_exception_handler);
+    dish_context.lua_state.set_exception_handler(lua::dish_sol_exception_handler);
     dish_context.lua_state["dish"] = dish_context.lua_state.create_table();
-    dish_context.lua_state["dish"]["history"] = dish_context.lua_state.create_table();
     dish_context.lua_state["dish"]["environment"] = dish_context.lua_state.create_table();
     dish_context.lua_state["dish"]["alias"] = dish_context.lua_state.create_table();
     dish_context.lua_state["dish"]["func"] = dish_context.lua_state.create_table();
     dish_context.lua_state["dish"]["last_foreground_ret"] = sol::nil;
     dish_context.lua_state["dish"]["last_dir"] = utils::get_home();
-    dish_context.lua_state["dish"]["prompt"] = [] { fmt::print("\n{} ",utils::red(getuid() == 0 ? "#" : "$"));};
+    dish_context.lua_state["dish"]["history_path"] = "dish_history";
+    dish_context.lua_state["dish"]["prompt"] = dish_default_prompt;
 
     dish_context.waiting = false;
     dish_context.terminal = STDIN_FILENO;
     dish_context.is_interactive = isatty(dish_context.terminal);
 
-    char ** envir = environ;
-    while(*envir)
+    char **envir = environ;
+    while (*envir)
     {
       std::string tmp{*envir};
       auto eq = tmp.find('=');
-      if(eq == std::string::npos)
+      if (eq == std::string::npos)
       {
         fmt::println(stderr, "Unexpected env: {}", tmp);
         std::exit(-1);
       }
-      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq)]
-              = tmp.substr(eq + 1);
+      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq)] = tmp.substr(eq + 1);
       envir++;
     }
 
-    dish_context.lua_state["dish"]["environment"]["PWD"]
-            = std::filesystem::current_path().string();
+    dish_context.lua_state["dish"]["environment"]["PWD"] = std::filesystem::current_path().string();
     dish_context.lua_state["dish"]["environment"]["USERNAME"] = getpwuid(getuid())->pw_name;
     dish_context.lua_state["dish"]["environment"]["HOME"] = getpwuid(getuid())->pw_dir;
     dish_context.lua_state["dish"]["environment"]["UID"] = std::to_string(getuid());
 
-    if(!dish_context.lua_state["dish"]["environment"]["PATH"].valid())
+    if (!dish_context.lua_state["dish"]["environment"]["PATH"].valid())
     {
       dish_context.lua_state["dish"]["environment"]["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
     }
@@ -98,7 +102,7 @@ namespace dish
     {
       while (tcgetpgrp(dish_context.terminal) != (dish_context.pgid = getpgrp()))
         kill(-dish_context.pgid, SIGTTIN);
-      
+
       signal(SIGINT, SIG_IGN);
       signal(SIGQUIT, SIG_IGN);
       signal(SIGTSTP, SIG_IGN);
@@ -114,12 +118,18 @@ namespace dish
       }
       tcsetpgrp(dish_context.terminal, dish_context.pgid);
       tcgetattr(dish_context.terminal, &dish_context.tmodes);
+      // Put the terminal to raw mode for line editing.
+      dish_context.tmodes.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+      dish_context.tmodes.c_cflag |= (CS8);
+      dish_context.tmodes.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+      dish_context.tmodes.c_cc[VMIN] = 1;
+      dish_context.tmodes.c_cc[VTIME] = 0;
+      tcsetattr(dish_context.terminal, TCSAFLUSH, &dish_context.tmodes);
     }
   }
   
-  void run(const std::string &cmd)
+  void run_command(const std::string &cmd)
   {
-    dish_context.lua_state["dish"]["history"].get<sol::table>().add(cmd);
     lexer::Lexer lexer{cmd};
     auto tokens = lexer.get_all_tokens();
     if (!tokens.has_value()) return;
@@ -162,20 +172,5 @@ namespace dish
     if(with_curr)
       ret.emplace_back(std::filesystem::current_path().string());
     return ret;
-  }
-
-  [[noreturn]]void loop()
-  {
-    while (true)
-    {
-      std::string cmd;
-      dish_context.lua_state["dish"]["prompt"]();
-      std::cin.clear();
-      std::getline(std::cin, cmd);
-      if (!cmd.empty())
-      {
-        run(cmd);
-      }
-    }
   }
 }

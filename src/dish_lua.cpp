@@ -12,11 +12,11 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
+#include "dish/dish_lua.hpp"
 #include "dish/dish.hpp"
 #include "dish/utils.hpp"
-#include "dish/dish_script.hpp"
 
-namespace dish::script
+namespace dish::lua
 {
   sol::protected_function_result dish_sol_error_handler(lua_State *L, sol::protected_function_result pfr)
   {
