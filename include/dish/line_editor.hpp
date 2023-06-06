@@ -38,6 +38,8 @@ namespace dish::line_editor
     size_t history_pos;
 
     size_t last_refresh_pos;
+
+    std::string searching_history_pattern;
   };
   extern LineEditorContext dle_context;
   extern void dle_init();

@@ -337,27 +337,25 @@ namespace dish::builtin
     {
       if (auto alias = dish_context.lua_state["dish"]["alias"][*it]; alias.valid())
         fmt::println("{} is an alias for {}", *it, alias.get<std::string>());
-      else if(builtins.find(*it) != builtins.end())
-        fmt::println("{} is a shell builtin", *it);
-      else if(dish_context.lua_state["dish"]["func"][*it].valid())
-        fmt::println("{} is a lua function", *it);
       else
       {
-        bool found = false;
-        std::string path;
-        for (auto p : get_path(false))
+        auto [type, cmd] = utils::find_command(*it);
+        switch (type)
         {
-          path = p + "/" + *it;
-          if (std::filesystem::exists(path))
-          {
-            found = true;
+          case utils::CommandType::not_found:
+          case utils::CommandType::not_executable:
+            fmt::println("{} not found", *it);
             break;
-          }
+          case utils::CommandType::builtin:
+            fmt::println("{} is a shell builtin", *it);
+            break;
+          case utils::CommandType::lua_func:
+            fmt::println("{} is a lua function", *it);
+            break;
+          case utils::CommandType::executable_file:
+            fmt::println("{} is {}", *it, cmd);
+            break;
         }
-        if(!found)
-          fmt::println("{} not found", *it);
-        else
-          fmt::println("{} is {}", *it, path);
       }
     }
     return 0;

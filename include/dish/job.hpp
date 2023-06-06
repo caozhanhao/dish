@@ -17,6 +17,7 @@
 
 #include "builtin.hpp"
 #include "dish.hpp"
+#include "utils.hpp"
 
 #include <sys/types.h>
 #include <termios.h>
@@ -55,10 +56,10 @@ namespace dish::job
   };
   
   class Job;
-
   enum class ProcessType
   {
-    unknown, builtin, lua_func, path_to_exe
+    unknown, builtin, lua_func,
+    executable_file
   };
 
   class Process

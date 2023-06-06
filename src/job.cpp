@@ -75,13 +75,13 @@ namespace dish::job
     }
     else if(type == ProcessType::lua_func)
     {
-      std::string script = fmt::format("print(dish.func.{}({}))", args[0],
-                                       fmt::join(args.begin() + 1, args.end(), ", "));
+      std::string script = fmt::format("print(dish.func.{}(\"{}\"))", args[0],
+                                       fmt::join(args.begin() + 1, args.end(), "\",\""));
       dish_context.lua_state.script(script, &lua::dish_sol_error_handler);
       completed = true;
       do_job_notification();
     }
-    else if(type == ProcessType::path_to_exe)
+    else if(type == ProcessType::executable_file)
     {
       childpid = fork();
       if (childpid == 0)
@@ -149,48 +149,29 @@ namespace dish::job
   int Process::find_cmd()
   {
     if (args.empty() || args[0].empty())
-    {
       return -1;
-    }
-
-    if(builtin::builtins.find(args[0]) != builtin::builtins.end())
+    auto [cmd_type, cmd] = utils::find_command(args[0]);
+    switch (cmd_type)
     {
-      type = ProcessType::builtin;
-      return 0;
-    }
-
-    if(dish_context.lua_state["dish"]["func"][args[0]].valid())
-    {
-      type = ProcessType::lua_func;
-      return 0;
-    }
-
-    bool found = false;
-    std::string path_to_exe;
-    for (auto path: get_path())
-    {
-      path_to_exe = path + "/" + args[0];
-      if (std::filesystem::exists(path_to_exe))
-      {
-        found = true;
+      case utils::CommandType::not_found:
+        fmt::println(stderr, "dish: command not found: {}", args[0]);
+        return -1;
         break;
-      }
+      case utils::CommandType::builtin:
+        type = ProcessType::builtin;
+        break;
+      case utils::CommandType::lua_func:
+        type = ProcessType::lua_func;
+        break;
+      case utils::CommandType::executable_file:
+        cmd_path = cmd;
+        type = ProcessType::executable_file;
+        break;
+      case utils::CommandType::not_executable:
+        fmt::println(stderr, "dish: permission denied: {}", args[0]);
+        return -1;
+        break;
     }
-    if (!found)
-    {
-      fmt::println(stderr, "dish: command not found: {}", args[0]);
-      return -1;
-    }
-    auto p = std::filesystem::status(path_to_exe).permissions();
-    if (!(((p & std::filesystem::perms::owner_exec) != std::filesystem::perms::none) ||
-         ((p & std::filesystem::perms::group_exec) != std::filesystem::perms::none) ||
-         ((p & std::filesystem::perms::others_exec) != std::filesystem::perms::none)))
-    {
-      fmt::println(stderr, "dish: permission denied: {}", args[0]);
-      return -1;
-    }
-    cmd_path = path_to_exe;
-    type = ProcessType::path_to_exe;
     return 0;
   }
 

@@ -15,6 +15,7 @@
 #include "dish/parser.hpp"
 #include "dish/lexer.hpp"
 #include "dish/job.hpp"
+#include "dish/line_editor.hpp"
 #include "dish/utils.hpp"
 
 #include <sys/wait.h>
@@ -67,6 +68,17 @@ namespace dish
     dish_context.lua_state["dish"]["last_dir"] = utils::get_home();
     dish_context.lua_state["dish"]["history_path"] = "dish_history";
     dish_context.lua_state["dish"]["prompt"] = dish_default_prompt;
+    dish_context.lua_state["dish"]["color"] = dish_context.lua_state.create_table();
+    dish_context.lua_state["dish"]["color"]["cmd"] = static_cast<int>(utils::Color::BLUE);
+    dish_context.lua_state["dish"]["color"]["arg"] = static_cast<int>(utils::Color::LIGHT_BLUE);
+    dish_context.lua_state["dish"]["color"]["string"] = static_cast<int>(utils::Color::YELLOW);
+    dish_context.lua_state["dish"]["color"]["env"] = static_cast<int>(utils::Color::GREEN);
+    dish_context.lua_state["dish"]["color"]["error"] = static_cast<int>(utils::Color::RED);
+    dish_context.lua_state["dish_add_history"]=
+        [](std::string timestamp, std::string cmd)
+    {
+      line_editor::dle_context.history.emplace_back(line_editor::History{cmd, timestamp});
+    };
 
     dish_context.waiting = false;
     dish_context.terminal = STDIN_FILENO;

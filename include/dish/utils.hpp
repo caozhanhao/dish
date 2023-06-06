@@ -16,6 +16,7 @@
 #pragma once
 
 #include "dish.hpp"
+#include "builtin.hpp"
 
 #define FMT_HEADER_ONLY
 #include "bundled/fmt/core.h"
@@ -26,6 +27,7 @@
 
 #include <vector>
 #include <optional>
+#include <filesystem>
 #include <chrono>
 #include <list>
 #include <algorithm>
@@ -46,7 +48,7 @@ namespace dish::utils
   
   static std::string colorify(const std::string &str, Color type)
   {
-    return "\033[1;" + std::to_string(static_cast<std::size_t>(type)) + "m" + str + "\033[0m";
+    return "\033[" + std::to_string(static_cast<std::size_t>(type)) + "m" + str + "\033[0m";
   }
   
   static std::string red(const std::string &str)
@@ -230,12 +232,47 @@ static std::string simplify_path(const std::string &path)
 
   static std::string get_timestamp()
   {
-    auto tp = std::chrono::time_point_cast<std::chrono::milliseconds>
+    auto tp = std::chrono::time_point_cast<std::chrono::seconds>
             (std::chrono::system_clock::now());
     return std::to_string
-            (std::chrono::duration_cast<std::chrono::milliseconds>
+            (std::chrono::duration_cast<std::chrono::seconds>
                                            (tp.time_since_epoch()).count());
 
+  }
+  enum class CommandType
+  {
+    not_found, builtin, lua_func, executable_file, not_executable
+  };
+
+  static std::tuple<CommandType, std::string> find_command(const std::string& cmd)
+  {
+    if(builtin::builtins.find(cmd) != builtin::builtins.end())
+      return {CommandType::builtin, cmd};
+
+    if(dish_context.lua_state["dish"]["func"][cmd].valid())
+      return {CommandType::lua_func, cmd};
+
+    bool found = false;
+    std::string path_to_exe;
+    for (auto path: get_path())
+    {
+      path_to_exe = path + "/" + cmd;
+      if (std::filesystem::exists(path_to_exe))
+      {
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      return {CommandType::not_found, ""};
+    auto p = std::filesystem::status(path_to_exe).permissions();
+    if (!(((p & std::filesystem::perms::owner_exec) != std::filesystem::perms::none) ||
+          ((p & std::filesystem::perms::group_exec) != std::filesystem::perms::none) ||
+          ((p & std::filesystem::perms::others_exec) != std::filesystem::perms::none)))
+    {
+      return {CommandType::not_executable, path_to_exe};
+    }
+    return {CommandType::executable_file, path_to_exe};
   }
 }
 #endif
