@@ -32,6 +32,16 @@ function hint(pattern)
 end
 dish.hint = hint;
 
+function complete(pattern)
+    if(pattern == "git ") then
+        return {
+            "add", "checkout", "commit", "fetch", "init", "log", "ls-files",
+            "merge", "mv", "pull", "push", "remote", "rm", "status"
+        }
+    end
+end
+dish.complete = complete;
+
 function load_zsh_history(path)
     local ret = {}
     file = io.open(path, "r")
@@ -56,4 +66,3 @@ function load_zsh_history(path)
     end
 end
 dish.func["load_zsh_history"] = load_zsh_history;
-

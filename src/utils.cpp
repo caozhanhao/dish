@@ -36,50 +36,54 @@
 
 namespace dish::utils
 {
-  std::string effect(const std::string &str, int effect)
+
+
+  std::string effect(const std::string &str, Effect effect_)
   {
-    return fmt::format("\033[{}m{}\033[0m", effect, str);
-  }
-  std::string effect(const std::string &str, const std::vector<Effect>& effects)
-  {
-    std::vector<int> e;
-    auto convert = [](Effect s) -> int { return static_cast<int>(s); };
-    std::transform(effects.begin(), effects.end(), std::back_inserter(e), convert);
-    return fmt::format("\033[{}m{}\033[0m", fmt::join(e, ";"), str);
+    if (str.empty()) return "";
+    int effect = static_cast<int>(effect_);
+    int end = 0;
+    if(effect >= 1 && effect <= 7)
+      end = effect + 20;
+    else if(effect >= 30 && effect <= 37)
+      end = 39;
+    else if(effect >= 40 && effect <= 47)
+      end = 49;
+    return fmt::format("\033[{}m{}\033[{}m", effect, str, end);
   }
 
   std::string red(const std::string &str)
   {
-    return effect(str, {Effect::fg_red});
+    return effect(str, Effect::fg_red);
   }
   std::string green(const std::string &str)
   {
-    return effect(str, {Effect::fg_green});
+    return effect(str, Effect::fg_green);
   }
   std::string yellow(const std::string &str)
   {
-    return effect(str, {Effect::fg_yellow});
+    return effect(str, Effect::fg_yellow);
   }
   std::string blue(const std::string &str)
   {
-    return effect(str, {Effect::fg_blue});
+    return effect(str, Effect::fg_blue);
   }
   std::string magenta(const std::string &str)
   {
-    return effect(str, {Effect::fg_magenta});
+    return effect(str, Effect::fg_magenta);
   }
   std::string cyan(const std::string &str)
   {
-    return effect(str, {Effect::fg_cyan});
+    return effect(str, Effect::fg_cyan);
   }
   std::string white(const std::string &str)
   {
-    return effect(str, {Effect::fg_white});
+    return effect(str, Effect::fg_white);
   }
 
   std::string get_dish_env(const std::string &s)
   {
-    if(auto it = dish_context.lua_state["dish"]["environment"][s]; it.valid())
+    if (auto it = dish_context.lua_state["dish"]["environment"][s]; it.valid())
       return it.get<std::string>();
     return "";
   }
@@ -93,16 +97,16 @@ namespace dish::utils
   {
     std::string home;
     const std::vector<std::string> env_to_find{"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"};
-    for(auto& r : env_to_find)
+    for (auto &r: env_to_find)
     {
-      if(auto it = dish_context.lua_state["dish"]["environment"][r]; it.valid())
+      if (auto it = dish_context.lua_state["dish"]["environment"][r]; it.valid())
       {
         home = it.get<std::string>();
         break;
       }
     }
-    if(home.empty()) return std::nullopt;
-    if(*home.rbegin() == '/') home.pop_back();
+    if (home.empty()) return std::nullopt;
+    if (*home.rbegin() == '/') home.pop_back();
     return home;
   }
 
@@ -116,11 +120,7 @@ namespace dish::utils
       for (auto it = str.cbegin(); it < str.cend(); ++it)
       {
         if (*it == '~' &&
-            ((it + 1 != str.cend() && it != str.cbegin() && *(it + 1) == '/' && *(it - 1) == '/')
-             || (it + 1 == str.cend() && it != str.cbegin() && *(it - 1) == '/')
-             || (it + 1 != str.cend() && it == str.cbegin() && *(it + 1) == '/')
-             || (it + 1 == str.cend() && it == str.cbegin())
-                     ))
+            ((it + 1 != str.cend() && it != str.cbegin() && *(it + 1) == '/' && *(it - 1) == '/') || (it + 1 == str.cend() && it != str.cbegin() && *(it - 1) == '/') || (it + 1 != str.cend() && it == str.cbegin() && *(it + 1) == '/') || (it + 1 == str.cend() && it == str.cbegin())))
         {
           s += home.value();
         }
@@ -131,7 +131,7 @@ namespace dish::utils
     else
       s = str;
     // Wildcards
-    if(utils::has_wildcards(str))
+    if (utils::has_wildcards(str))
     {
       std::string pattern{'^'};
       for (auto it = s.cbegin(); it < s.cend(); ++it)
@@ -204,12 +204,8 @@ namespace dish::utils
 
   std::string get_timestamp()
   {
-    auto tp = std::chrono::time_point_cast<std::chrono::seconds>
-            (std::chrono::system_clock::now());
-    return std::to_string
-            (std::chrono::duration_cast<std::chrono::seconds>
-             (tp.time_since_epoch()).count());
-
+    auto tp = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now());
+    return std::to_string(std::chrono::duration_cast<std::chrono::seconds>(tp.time_since_epoch()).count());
   }
 
   std::string to_string(CommandType ct)
@@ -238,12 +234,12 @@ namespace dish::utils
     return "";
   }
 
-  bool operator<(const Command& a, const Command& b)
+  bool operator<(const Command &a, const Command &b)
   {
     return a.name < b.name;
   }
 
-  bool is_executable(const std::filesystem::path& path)
+  bool is_executable(const std::filesystem::path &path)
   {
     auto p = std::filesystem::status(path).permissions();
     return (((p & std::filesystem::perms::owner_exec) != std::filesystem::perms::none) ||
@@ -251,58 +247,58 @@ namespace dish::utils
             ((p & std::filesystem::perms::others_exec) != std::filesystem::perms::none));
   }
 
-  bool begin_with(const std::string& a, const std::string& b)
+  bool begin_with(const std::string &a, const std::string &b)
   {
-    if(a.size() < b.size()) return false;
-    for(size_t i = 0; i < b.size(); ++i)
+    if (a.size() < b.size()) return false;
+    for (size_t i = 0; i < b.size(); ++i)
     {
-      if(a[i] != b[i])
+      if (a[i] != b[i])
         return false;
     }
     return true;
   }
 
-  std::set<Command> match_command(const std::string& pattern)
+  std::set<Command> match_command(const std::string &pattern)
   {
     std::set<Command> ret;
     // PATH
-    for(auto & path : get_path())
+    for (auto &path: get_path())
     {
-      for (auto& dir_entry : std::filesystem::directory_iterator{path})
+      for (auto &dir_entry: std::filesystem::directory_iterator{path})
       {
-        if(dir_entry.is_directory() || !is_executable(dir_entry.path())) continue;
-        if(begin_with(dir_entry.path().filename().string(), pattern))
+        if (dir_entry.is_directory() || !is_executable(dir_entry.path())) continue;
+        if (begin_with(dir_entry.path().filename().string(), pattern))
         {
           auto size = std::filesystem::file_size(dir_entry.path());
           CommandType type = CommandType::executable_file;
-          if(std::filesystem::is_symlink(dir_entry.path()))
+          if (std::filesystem::is_symlink(dir_entry.path()))
             type = CommandType::executable_link;
-          ret.insert(Command{dir_entry.path().filename(), pattern, type, size});
+          ret.insert(Command{dir_entry.path().filename(), type, size});
         }
       }
     }
     // builtin
-    for(auto& r : builtin::builtins)
+    for (auto &r: builtin::builtins)
     {
-      if(begin_with(r.first, pattern))
-        ret.insert(Command{r.first, pattern, CommandType::builtin, 0});
+      if (begin_with(r.first, pattern))
+        ret.insert(Command{r.first, CommandType::builtin, 0});
     }
     // lua function
-    for(auto& r : dish_context.lua_state["dish"]["func"].get<sol::table>())
+    for (auto &r: dish_context.lua_state["dish"]["func"].get<sol::table>())
     {
       auto fn = r.first.as<std::string>();
-      if(begin_with(fn, pattern))
-        ret.insert(Command{fn, pattern, CommandType::lua_func, 0});
+      if (begin_with(fn, pattern))
+        ret.insert(Command{fn, CommandType::lua_func, 0});
     }
     return ret;
   }
 
-  std::tuple<CommandType, std::string> find_command(const std::string& cmd)
+  std::tuple<CommandType, std::string> find_command(const std::string &cmd)
   {
-    if(builtin::builtins.find(cmd) != builtin::builtins.end())
+    if (builtin::builtins.find(cmd) != builtin::builtins.end())
       return {CommandType::builtin, cmd};
 
-    if(dish_context.lua_state["dish"]["func"][cmd].valid())
+    if (dish_context.lua_state["dish"]["func"][cmd].valid())
       return {CommandType::lua_func, cmd};
 
     bool found = false;
@@ -320,7 +316,7 @@ namespace dish::utils
       return {CommandType::not_found, ""};
     if (!is_executable(abs_path))
       return {CommandType::not_executable, abs_path};
-    if(std::filesystem::is_symlink(std::filesystem::path(abs_path)))
+    if (std::filesystem::is_symlink(std::filesystem::path(abs_path)))
       return {CommandType::executable_link, abs_path};
     return {CommandType::executable_file, abs_path};
   }
@@ -329,22 +325,69 @@ namespace dish::utils
   {
     int i = 0;
     double mantissa = sz;
-    for (; mantissa >= 1024.; mantissa /= 1024., ++i) { }
+    for (; mantissa >= 1024.; mantissa /= 1024., ++i) {
+    }
     mantissa = std::ceil(mantissa * 10.) / 10.;
     return fmt::format("{}{}", mantissa, "BKMGTPE"[i]);
   }
 
-  struct HumanReadable
+  std::vector<std::string> match_files_and_dirs(const std::string &complete)
   {
-    std::uintmax_t size{};
-  private: friend
-            std::ostream& operator<<(std::ostream& os, HumanReadable hr) {
-      int i{};
-      double mantissa = hr.size;
-      for (; mantissa >= 1024.; mantissa /= 1024., ++i) { }
-      mantissa = std::ceil(mantissa * 10.) / 10.;
-      os << mantissa << "BKMGTPE"[i];
-      return i == 0 ? os : os << "B (" << hr.size << ')';
+    std::vector<std::string> ret;
+    std::filesystem::directory_iterator dit;
+    std::string pattern_to_match;
+    auto curr = std::filesystem::current_path();
+    if (complete.empty() || complete.find('/') == std::string::npos)
+    {
+      dit = std::filesystem::directory_iterator{curr};
+      pattern_to_match = complete;
     }
-  };
+    else
+    {
+      std::filesystem::path path(complete);
+      if (std::filesystem::is_directory(path))
+      {
+        if (!std::filesystem::exists(path))
+          return {};
+        pattern_to_match = "";
+        dit = std::filesystem::directory_iterator{curr / path};
+      }
+      else
+      {
+        if (!std::filesystem::exists(path.parent_path()))
+          return {};
+        pattern_to_match = complete;
+        dit = std::filesystem::directory_iterator{path.parent_path()};
+      }
+    }
+
+    for (auto &dir_entry: dit)
+    {
+      if (begin_with(dir_entry.path().lexically_relative(curr).string(),
+                     pattern_to_match))
+      {
+        ret.emplace_back(dir_entry.path()
+                                 .lexically_relative(curr)
+                                 .string());
+        if (dir_entry.is_directory())
+          ret.back() += "/";
+      }
+    }
+    return ret;
+  }
+
+  size_t get_length_without_ansi_escape(const std::string &str)
+  {
+    size_t size = 0;
+    for (auto it = str.cbegin(); it < str.cend(); ++it)
+    {
+      if(*it == '\033')
+      {
+        while(it < str.cend() && *it != 'm') ++it;
+        continue ;
+      }
+      ++size;
+    }
+    return size;
+  }
 }

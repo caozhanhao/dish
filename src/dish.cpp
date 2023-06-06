@@ -67,8 +67,9 @@ namespace dish
     dish_context.lua_state["dish"]["last_foreground_ret"] = sol::nil;
     dish_context.lua_state["dish"]["last_dir"] = utils::get_home();
     dish_context.lua_state["dish"]["history_path"] = "dish_history";
-    dish_context.lua_state["dish"]["prompt"] = dish_default_prompt;
+    dish_context.lua_state["dish"]["prompt"] = sol::nil;
     dish_context.lua_state["dish"]["hint"] = sol::nil;
+    dish_context.lua_state["dish"]["complete"] = sol::nil;
     dish_context.lua_state["dish"]["style"] = dish_context.lua_state.create_table();
     dish_context.lua_state["dish"]["style"]["cmd"] = static_cast<int>(utils::Effect::fg_blue);
     dish_context.lua_state["dish"]["style"]["arg"] = static_cast<int>(utils::Effect::fg_cyan);

@@ -24,16 +24,15 @@ int main(int argc, char **argv)
   dish::line_editor::load_history(history);
   while (dish::dish_context.running)
   {
-    auto prompt_lua = dish::dish_context.lua_state["dish"]["prompt"]();
     std::string prompt;
-    if(!prompt_lua.valid())
+    if (sol::protected_function h = dish::dish_context.lua_state["dish"]["prompt"]; h.valid())
     {
-      sol::error err = prompt_lua;
-      fmt::println(stderr, "Unexpected result from dish.prompt:\n{}", err.what());
-      prompt = dish::dish_default_prompt();
+      auto res = h();
+      if (res.valid() && res.get_type() == sol::type::string)
+        prompt = res.get<std::string>();
     }
-    else
-      prompt = prompt_lua.get<std::string>().c_str();
+    if(prompt.empty()) prompt = dish::dish_default_prompt();
+
     std::string line = dish::line_editor::read_line(prompt);
     dish::run_command(line);
   }

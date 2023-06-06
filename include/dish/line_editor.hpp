@@ -32,15 +32,27 @@ namespace dish::line_editor
 
   struct LineEditorContext
   {
-    std::vector<History> history;
+    // edit
     std::string line;
-    std::string hint;
     size_t pos;
-    size_t history_pos;
-
     size_t last_refresh_pos;
 
+    // history
+    std::vector<History> history;
+    size_t history_pos;
     std::string searching_history_pattern;
+
+    //hint
+    std::string hint;
+
+    // complete
+    std::string prompt;
+    size_t screen_width;
+    // color cmd(ANSI Escape Code), raw cmd
+    std::vector<std::vector<std::tuple<std::string, std::string>>> completion;
+    bool searching_completion;
+    size_t completion_pos_line;
+    size_t completion_pos_column;
   };
 
   extern LineEditorContext dle_context;

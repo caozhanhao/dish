@@ -30,7 +30,7 @@ namespace dish::utils
 {
   enum class Effect : std::size_t
   {
-    clear = 0, bold, faint, italic, underline, slow_blink, rapid_blink, color_reverse,
+    bold = 1, faint, italic, underline, slow_blink, rapid_blink, color_reverse,
     fg_black = 30, fg_red, fg_green, fg_yellow, fg_blue, fg_magenta, fg_cyan, fg_white,
     bg_black = 40, bg_red, bg_green, bg_yellow, bg_blue, bg_magenta, bg_cyan, bg_white
   };
@@ -43,13 +43,17 @@ namespace dish::utils
   struct Command
   {
     std::string name;
-    std::string pattern;
     CommandType type;
     size_t file_size;
   };
 
-  std::string effect(const std::string &str, int effect);
-  std::string effect(const std::string &str, const std::vector<Effect>& effects);
+  std::string effect(const std::string &str, Effect effect);
+  template<typename ...Args>
+  std::string effect(const std::string &str, Effect e, Args&& ...effects)
+  {
+    if (str.empty()) return "";
+    return effect(effect(str, e), effects...);
+  }
   std::string red(const std::string &str);
   std::string green(const std::string &str);
   std::string yellow(const std::string &str);
@@ -107,5 +111,9 @@ namespace dish::utils
   std::tuple<CommandType, std::string> find_command(const std::string& cmd);
 
   std::string get_human_readable_size(size_t sz);
+
+  std::vector<std::string> match_files_and_dirs(const std::string& path);
+
+  size_t get_length_without_ansi_escape(const std::string& str);
 }
 #endif

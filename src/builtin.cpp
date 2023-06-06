@@ -58,6 +58,8 @@ namespace dish::builtin
         fmt::println(stderr, "cd: {}", strerror(errno));
         return -1;
       }
+      dish_context.lua_state["dish"]["environment"]["PWD"]
+              = home_opt.value();
     }
     else if(args[1] == "-")
     {
