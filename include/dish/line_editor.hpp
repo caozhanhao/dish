@@ -34,6 +34,7 @@ namespace dish::line_editor
   {
     std::vector<History> history;
     std::string line;
+    std::string hint;
     size_t pos;
     size_t history_pos;
 
@@ -41,10 +42,16 @@ namespace dish::line_editor
 
     std::string searching_history_pattern;
   };
+
   extern LineEditorContext dle_context;
-  extern void dle_init();
-  extern std::string read_line(const std::string &prompt);
-  extern int save_history(const std::string & path);
-  extern int load_history(const std::string & path);
+
+  void dle_init();
+
+  std::string read_line(const std::string &prompt);
+
+  int save_history(const std::string &path);
+
+  int load_history(const std::string &path);
+
 }
 #endif

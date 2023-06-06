@@ -69,16 +69,16 @@ namespace dish::line_editor
 
   std::string get_color(int c)
   {
-    return "\033[" + std::to_string(c) + "m";
+    return fmt::format("\033[{}m", c);
   }
 
   std::string highlight_line()
   {
-    int cmd_color = dish_context.lua_state["dish"]["color"]["cmd"];
-    int arg_color = dish_context.lua_state["dish"]["color"]["arg"];
-    int str_color = dish_context.lua_state["dish"]["color"]["string"];
-    int env_color = dish_context.lua_state["dish"]["color"]["env"];
-    int err_color = dish_context.lua_state["dish"]["color"]["error"];
+    int cmd_color = dish_context.lua_state["dish"]["style"]["cmd"];
+    int arg_color = dish_context.lua_state["dish"]["style"]["arg"];
+    int str_color = dish_context.lua_state["dish"]["style"]["string"];
+    int env_color = dish_context.lua_state["dish"]["style"]["env"];
+    int err_color = dish_context.lua_state["dish"]["style"]["error"];
 
     if (dle_context.line.empty()) return "";
     std::string ret;
@@ -114,6 +114,15 @@ namespace dish::line_editor
           break;
       }
       ret += dle_context.line[i];
+    }
+    if(!dle_context.searching_history_pattern.empty())
+    {
+      auto beg = ret.find(dle_context.searching_history_pattern);
+      if(beg != std::string::npos)
+      {
+        ret.insert(beg, "\033[48;5;7m");
+        ret.insert(beg + 9 + dle_context.searching_history_pattern.size(), "\033[49m");
+      }
     }
     ret += get_color(0);
     return ret;
@@ -156,8 +165,91 @@ namespace dish::line_editor
     return 0;
   }
 
+  std::string get_hint()
+  {
+    // lua hint
+    if(sol::protected_function h = dish_context.lua_state["dish"]["hint"]; h.valid())
+    {
+      auto res = h(dle_context.line);
+      if(res.valid() && res.get_type() == sol::type::string)
+      {
+        auto r = res.get<std::string>();
+        if (!r.empty()) return r;
+      }
+    }
+    // history hint
+    auto it = std::find_if(dle_context.history.crbegin(), dle_context.history.crend(),
+                  [](auto&& f){return utils::begin_with(f.cmd, dle_context.line);});
+    if(it != dle_context.history.crend())
+      return it->cmd.substr(dle_context.line.size());
+    // command hint
+    if(dle_context.line.find(' ') == std::string::npos)
+    {
+      auto cmds = utils::match_command(dle_context.line);
+      if(!cmds.empty())
+        return cmds.begin()->name.substr(dle_context.line.size());
+    }
+    return "";
+  }
+
+  std::vector<std::string> get_complete_items()
+  {
+    // lexer => same token
+    return {"abc", "def"};
+  }
+
+
+  void refresh_line()
+  {
+    std::string esc;
+    // move to begin and clear the line
+    if (dle_context.last_refresh_pos != 0)
+      esc += fmt::format("\x1b[{}D\x1b[K", dle_context.last_refresh_pos);
+    else
+      esc += "\x1b[K";
+    // the current line
+    esc += highlight_line();
+    // hint
+    dle_context.hint = get_hint();
+    esc += utils::effect(dle_context.hint,
+                         dish_context.lua_state["dish"]["style"]["hint"].get<int>());
+    // move cursor back
+    if (dle_context.pos < dle_context.line.size() + dle_context.hint.size())
+    {
+      esc += fmt::format("\x1b[{}D",
+                         dle_context.hint.size() + dle_context.line.size() - dle_context.pos);
+    }
+    // save pos for next refresh
+    dle_context.last_refresh_pos = dle_context.pos;
+    std::cout.write(esc.c_str(), esc.size());
+  }
+
+
   int complete_line()
   {
+    // command
+    if(dle_context.line.find(' ') == std::string::npos)
+    {
+      auto cmds = utils::match_command(dle_context.line);
+      for (auto &r: cmds)
+      {
+        auto name = utils::effect(r.pattern,
+                                  {utils::Effect::bold, utils::Effect::underline});
+        name += r.name.substr(r.pattern.size());
+        if (r.type == utils::CommandType::executable_file || r.type == utils::CommandType::executable_link)
+        {
+          fmt::println("{} ({}, {})", name, utils::to_string(r.type),
+                       utils::get_human_readable_size(r.file_size));
+        }
+        else
+          fmt::println("{} ({})", name, utils::to_string(r.type));
+      }
+    }
+    // default to list file
+    else
+    {
+
+    }
     return 0;
   }
 
@@ -173,12 +265,20 @@ namespace dish::line_editor
 
   void move_to_end()
   {
-    if(dle_context.pos == dle_context.line.size()) return;
+    if (dle_context.pos == dle_context.line.size() && dle_context.hint.empty()) return;
+    bool refresh = false;
+    if (!dle_context.hint.empty())
+    {
+      dle_context.line += dle_context.hint;
+      dle_context.hint.clear();
+      refresh = true;
+    }
     auto origin = dle_context.pos;
     dle_context.pos = dle_context.line.size();
     auto esc = fmt::format("\x1b[{}C", dle_context.pos - origin);
     dle_context.last_refresh_pos = dle_context.pos;
-    std::cout.write(esc.c_str(),esc.size());
+    std::cout.write(esc.c_str(), esc.size());
+    if (refresh) refresh_line();
   }
 
   void move_to_word_beginning()
@@ -231,26 +331,6 @@ namespace dish::line_editor
     }
   }
 
-  void refresh_line()
-  {
-    std::string esc;
-    // move to begin and clear the line
-    if(dle_context.last_refresh_pos != 0)
-      esc += fmt::format("\x1b[{}D\x1b[K", dle_context.last_refresh_pos);
-    else
-      esc += "\x1b[K";
-    // the current line
-    esc += highlight_line();
-    // move cursor back
-    if(dle_context.pos < dle_context.line.size())
-    {
-      esc += fmt::format("\x1b[{}D", dle_context.line.size() - dle_context.pos);
-    }
-    // save pos for next refresh
-    dle_context.last_refresh_pos = dle_context.pos;
-    std::cout.write(esc.c_str(), esc.size());
-  }
-
   void edit_delete()
   {
     if(dle_context.pos >= dle_context.line.size()) return;
@@ -282,7 +362,9 @@ namespace dish::line_editor
 
   void edit_history_helper(bool prev)
   {
-    dle_context.history.back().cmd = dle_context.line;
+    // first search should save the current line
+    if(dle_context.searching_history_pattern.empty())
+      dle_context.history.back().cmd = dle_context.line;
     auto next_history = [prev]() -> int
     {
       auto origin = dle_context.history_pos;
@@ -308,7 +390,10 @@ namespace dish::line_editor
     };
     if(!dle_context.line.empty())
     {
+      auto origin = dle_context.history_pos;
       bool found = false;
+      // If this is the first search, save it for next search and highlight.
+      // Otherwise, restore the pattern saved previously
       if(dle_context.searching_history_pattern.empty())
         dle_context.searching_history_pattern = dle_context.line;
       while (next_history() != -1)
@@ -321,7 +406,7 @@ namespace dish::line_editor
         break;
       }
       if(!found)
-        dle_context.history_pos = dle_context.history.size() - 1;
+        dle_context.history_pos = origin;
     }
     else
       next_history();
@@ -330,7 +415,6 @@ namespace dish::line_editor
     refresh_line();
     move_to_end();
   }
-
 
   void edit_prev_history()
   {
@@ -544,7 +628,7 @@ namespace dish::line_editor
             edit_backspace();
             break;
           default:
-            fmt::println(stderr, "\nWARNING: Ignored unrecognized key '{}'.", buf);
+            fmt::println(stderr, "\nWARNING: Ignored unrecognized key '{}'.", buf[0]);
             dle_context.history.pop_back();
             dle_context.line.clear();
             dle_context.pos = 0;
@@ -556,6 +640,7 @@ namespace dish::line_editor
       else
       {
         dle_context.line.insert(dle_context.line.begin() + dle_context.pos, buf[0]);
+        // Input a character should close the history searching.
         dle_context.searching_history_pattern.clear();
         ++dle_context.pos;
         refresh_line();

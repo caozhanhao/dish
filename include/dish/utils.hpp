@@ -15,198 +15,60 @@
 #define DISH_UTILS_HPP
 #pragma once
 
-#include "dish.hpp"
-#include "builtin.hpp"
+#include <list>
+#include <vector>
+#include <string>
+#include <set>
+#include <optional>
+#include <filesystem>
 
 #define FMT_HEADER_ONLY
 #include "bundled/fmt/core.h"
 
-#include <sys/types.h>
-#include <dirent.h>
-#include <unistd.h>
-
-#include <vector>
-#include <optional>
-#include <filesystem>
-#include <chrono>
-#include <list>
-#include <algorithm>
-#include <string>
-#include <string_view>
-#include <regex>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 
 namespace dish::utils
 {
-  enum class Color : std::size_t
+  enum class Effect : std::size_t
   {
-    RED = 31, GREEN, YELLOW, BLUE, PURPLE, LIGHT_BLUE,
-    WHITE
+    clear = 0, bold, faint, italic, underline, slow_blink, rapid_blink, color_reverse,
+    fg_black = 30, fg_red, fg_green, fg_yellow, fg_blue, fg_magenta, fg_cyan, fg_white,
+    bg_black = 40, bg_red, bg_green, bg_yellow, bg_blue, bg_magenta, bg_cyan, bg_white
   };
   
-  static std::string colorify(const std::string &str, Color type)
+  enum class CommandType
   {
-    return "\033[" + std::to_string(static_cast<std::size_t>(type)) + "m" + str + "\033[0m";
-  }
-  
-  static std::string red(const std::string &str)
+    not_found, builtin, lua_func, executable_file, executable_link,
+    not_executable
+  };
+  struct Command
   {
-    return colorify(str, Color::RED);
-  }
-  static std::string green(const std::string &str)
-  {
-    return colorify(str, Color::GREEN);
-  }
-  static std::string yellow(const std::string &str)
-  {
-    return colorify(str, Color::YELLOW);
-  }
-  static std::string blue(const std::string &str)
-  {
-    return colorify(str, Color::BLUE);
-  }
-  static std::string purple(const std::string &str)
-  {
-    return colorify(str, Color::PURPLE);
-  }
-  static std::string light_blue(const std::string &str)
-  {
-    return colorify(str, Color::BLUE);
-  }
-  static std::string white(const std::string &str)
-  {
-    return colorify(str, Color::WHITE);
-  }
-  
-  static std::string get_dish_env(const std::string &s)
-  {
-    if(auto it = dish_context.lua_state["dish"]["environment"][s]; it.valid())
-      return it.get<std::string>();
-    return "";
-  }
-  static bool has_wildcards(const std::string &s)
-  {
-    return (s.find('*') != std::string::npos ||
-            s.find('?') != std::string::npos);
-  }
+    std::string name;
+    std::string pattern;
+    CommandType type;
+    size_t file_size;
+  };
 
-  static std::optional<std::string> get_home()
-  {
-    std::string home;
-    const std::vector<std::string> env_to_find{"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"};
-    for(auto& r : env_to_find)
-    {
-      if(auto it = dish_context.lua_state["dish"]["environment"][r]; it.valid())
-      {
-        home = it.get<std::string>();
-        break;
-      }
-    }
-    if(home.empty()) return std::nullopt;
-    if(*home.rbegin() == '/') home.pop_back();
-    return home;
-  }
+  std::string effect(const std::string &str, int effect);
+  std::string effect(const std::string &str, const std::vector<Effect>& effects);
+  std::string red(const std::string &str);
+  std::string green(const std::string &str);
+  std::string yellow(const std::string &str);
+  std::string blue(const std::string &str);
+  std::string magenta(const std::string &str);
+  std::string cyan(const std::string &str);
+  std::string white(const std::string &str);
   
-  static std::optional<std::vector<std::string>> expand(const std::string &str)
-  {
-    std::string s;
-    auto home = get_home();
-    // Tilde(~)
-    if (home.has_value())
-    {
-      for (auto it = str.cbegin(); it < str.cend(); ++it)
-      {
-        if (*it == '~' &&
-            ((it + 1 != str.cend() && it != str.cbegin() && *(it + 1) == '/' && *(it - 1) == '/')
-             || (it + 1 == str.cend() && it != str.cbegin() && *(it - 1) == '/')
-             || (it + 1 != str.cend() && it == str.cbegin() && *(it + 1) == '/')
-             || (it + 1 == str.cend() && it == str.cbegin())
-             ))
-        {
-          s += home.value();
-        }
-        else
-          s += *it;
-      }
-    }
-    else
-      s = str;
-    // Wildcards
-    if(utils::has_wildcards(str))
-    {
-      std::string pattern{'^'};
-      for (auto it = s.cbegin(); it < s.cend(); ++it)
-      {
-        auto &ch = *it;
-        switch (ch)
-        {
-          case '*':
-            pattern += ".*";
-            break;
-          case '?':
-            pattern += ".?";
-            break;
-          case '.':
-            pattern += "\\.";
-            break;
-          default:
-            pattern += ch;
-            break;
-        }
-      }
-      pattern += '$';
+  std::string get_dish_env(const std::string &s);
+  bool has_wildcards(const std::string &s);
+
+  std::optional<std::string> get_home();
   
-      DIR *dir = opendir(".");
-      if (dir == NULL)
-      {
-        fmt::println("opendir: {}", strerror(errno));
-        return std::nullopt;
-      }
+  std::optional<std::vector<std::string>> expand(const std::string &str);
   
-      std::regex re(pattern);
-      std::vector<std::string> ret;
-      dirent *ent;
-      while ((ent = readdir(dir)) != NULL)
-      {
-        if (std::regex_match(ent->d_name, re))
-        {
-          if (ent->d_name[0] == '.')
-          {
-            if (s[0] == '.')
-            {
-              ret.emplace_back(ent->d_name);
-            }
-          }
-          else
-          {
-            ret.emplace_back(ent->d_name);
-          }
-        }
-      }
-      closedir(dir);
-      std::sort(ret.begin(), ret.end());
-      return ret;
-    }
-    return {{s}};
-  }
-  
-static std::string simplify_path(const std::string &path)
-  {
-    auto home_opt = get_home();
-    if (!home_opt.has_value()) return path;
-    auto home = home_opt.value();
-    auto [it1, it2] = std::mismatch(path.cbegin(), path.cend(), home.cbegin(), home.cend());
-    if (it2 == home.cend())
-    {
-      return "~" + path.substr(home.size());
-    }
-    return path;
-  }
+  std::string simplify_path(const std::string &path);
 
   template<typename T>
-  static T split(std::string_view str, std::string_view delims = " ")
+  T split(std::string_view str, std::string_view delims = " ")
   {
     T ret;
     size_t first = 0;
@@ -230,49 +92,20 @@ static std::string simplify_path(const std::string &path)
     return *it;
   }
 
-  static std::string get_timestamp()
-  {
-    auto tp = std::chrono::time_point_cast<std::chrono::seconds>
-            (std::chrono::system_clock::now());
-    return std::to_string
-            (std::chrono::duration_cast<std::chrono::seconds>
-                                           (tp.time_since_epoch()).count());
+  std::string get_timestamp();
+  
+  std::string to_string(CommandType ct);
 
-  }
-  enum class CommandType
-  {
-    not_found, builtin, lua_func, executable_file, not_executable
-  };
+  bool operator<(const Command& a, const Command& b);
 
-  static std::tuple<CommandType, std::string> find_command(const std::string& cmd)
-  {
-    if(builtin::builtins.find(cmd) != builtin::builtins.end())
-      return {CommandType::builtin, cmd};
+  bool is_executable(const std::filesystem::path& path);
 
-    if(dish_context.lua_state["dish"]["func"][cmd].valid())
-      return {CommandType::lua_func, cmd};
+  bool begin_with(const std::string& a, const std::string& b);
 
-    bool found = false;
-    std::string path_to_exe;
-    for (auto path: get_path())
-    {
-      path_to_exe = path + "/" + cmd;
-      if (std::filesystem::exists(path_to_exe))
-      {
-        found = true;
-        break;
-      }
-    }
-    if (!found)
-      return {CommandType::not_found, ""};
-    auto p = std::filesystem::status(path_to_exe).permissions();
-    if (!(((p & std::filesystem::perms::owner_exec) != std::filesystem::perms::none) ||
-          ((p & std::filesystem::perms::group_exec) != std::filesystem::perms::none) ||
-          ((p & std::filesystem::perms::others_exec) != std::filesystem::perms::none)))
-    {
-      return {CommandType::not_executable, path_to_exe};
-    }
-    return {CommandType::executable_file, path_to_exe};
-  }
+  std::set<Command> match_command(const std::string& pattern);
+
+  std::tuple<CommandType, std::string> find_command(const std::string& cmd);
+
+  std::string get_human_readable_size(size_t sz);
 }
 #endif

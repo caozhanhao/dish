@@ -316,7 +316,7 @@ namespace dish::builtin
   {
     std::vector<std::string> list;
     for (auto &r:builtins)
-      list.emplace_back(utils::light_blue(r.first));
+      list.emplace_back(utils::cyan(r.first));
     
     fmt::println("{} \n {} \n {}",
         "Dish - caozhanhao",
@@ -350,9 +350,10 @@ namespace dish::builtin
             fmt::println("{} is a shell builtin", *it);
             break;
           case utils::CommandType::lua_func:
-            fmt::println("{} is a lua function", *it);
+            fmt::println("{} is a lua function.", *it);
             break;
           case utils::CommandType::executable_file:
+          case utils::CommandType::executable_link:
             fmt::println("{} is {}", *it, cmd);
             break;
         }

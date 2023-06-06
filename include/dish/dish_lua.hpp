@@ -19,7 +19,7 @@
 
 namespace dish::lua
 {
-  extern sol::protected_function_result dish_sol_error_handler(lua_State* L, sol::protected_function_result pfr);
-  extern int dish_sol_exception_handler(lua_State* L, sol::optional<const std::exception&> maybe_exception, sol::string_view description);
+  sol::protected_function_result dish_sol_error_handler(lua_State* L, sol::protected_function_result pfr);
+  int dish_sol_exception_handler(lua_State* L, sol::optional<const std::exception&> maybe_exception, sol::string_view description);
 }
 #endif

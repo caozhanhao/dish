@@ -49,17 +49,15 @@ namespace dish
 
   extern DishContext dish_context;
 
-  extern void dish_init();
+  void dish_init();
   
-  extern void run_command(const std::string &cmd);
+  void run_command(const std::string &cmd);
   
-  [[noreturn]] extern void loop();
+  std::list<std::string> get_history();
   
-  extern std::list<std::string> get_history();
-  
-  extern void do_job_notification();
+  void do_job_notification();
 
-  extern std::vector<std::string> get_path(bool with_curr = true);
-  extern std::string dish_default_prompt();
+  std::vector<std::string> get_path(bool with_curr = true);
+  std::string dish_default_prompt();
 }
 #endif

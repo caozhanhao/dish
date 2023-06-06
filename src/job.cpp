@@ -81,7 +81,7 @@ namespace dish::job
       completed = true;
       do_job_notification();
     }
-    else if(type == ProcessType::executable_file)
+    else if(type == ProcessType::executable)
     {
       childpid = fork();
       if (childpid == 0)
@@ -164,8 +164,9 @@ namespace dish::job
         type = ProcessType::lua_func;
         break;
       case utils::CommandType::executable_file:
+      case utils::CommandType::executable_link:
         cmd_path = cmd;
-        type = ProcessType::executable_file;
+        type = ProcessType::executable;
         break;
       case utils::CommandType::not_executable:
         fmt::println(stderr, "dish: permission denied: {}", args[0]);

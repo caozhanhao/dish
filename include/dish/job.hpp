@@ -59,7 +59,7 @@ namespace dish::job
   enum class ProcessType
   {
     unknown, builtin, lua_func,
-    executable_file
+    executable
   };
 
   class Process
