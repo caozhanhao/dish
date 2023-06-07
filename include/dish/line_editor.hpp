@@ -48,6 +48,9 @@ namespace dish::line_editor
     // complete
     std::string prompt;
     size_t screen_width;
+    size_t screen_height;
+    size_t completion_show_line_pos;
+    size_t completion_show_line_size;
     std::string complete_pattern; // for highlight
     std::vector<std::vector<std::tuple<std::string, std::string>>> completion; // output, raw_cmd
     bool searching_completion;
