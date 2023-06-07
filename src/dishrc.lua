@@ -26,7 +26,7 @@ function ys_prompt()
 end
 
 function my_prompt()
-    local p = string.format("\n[36m%s[0m in [1;32m%s[0m>",
+    local p = string.format("\n[36m%s[0m in [1;32m%s[0m> ",
             dish.environment.USERNAME, dish_get_shrunk_path())
     return p
 end
