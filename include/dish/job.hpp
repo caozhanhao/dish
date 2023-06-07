@@ -40,7 +40,7 @@ namespace dish::job
   {
   private:
     RedirectType type;
-    std::variant<int, std::string> redirect;
+    std::variant<int, tiny_utf8::string> redirect;
   public:
     Redirect() = default;
     template<typename T, typename = std::enable_if_t<!std::is_base_of_v<Redirect, std::decay_t<T>>>>
@@ -48,7 +48,7 @@ namespace dish::job
     
     bool is_description() const;
     
-    std::string get_filename() const;
+    tiny_utf8::string get_filename() const;
     
     int get_description() const;
     
@@ -67,8 +67,8 @@ namespace dish::job
     friend class Job;
   private:
     Job *job_context;
-    std::vector<std::string> args;
-    std::string cmd_path;
+    std::vector<tiny_utf8::string> args;
+    tiny_utf8::string cmd_path;
   public:
     ProcessType type;
     int pid;
@@ -83,7 +83,7 @@ namespace dish::job
 
     void launch();
     
-    void insert(std::string str);
+    void insert(tiny_utf8::string str);
     
     void clear();
     
@@ -100,7 +100,7 @@ namespace dish::job
   {
     friend class Process;
   private:
-    std::string command_str; //for message
+    tiny_utf8::string command_str; //for message
     Redirect out;
     Redirect in;
     Redirect err;
@@ -112,7 +112,7 @@ namespace dish::job
     bool notified;
   public:
     Job() = default;
-    Job(std::string cmd);
+    Job(tiny_utf8::string cmd);
     
     int launch();
     
@@ -143,7 +143,7 @@ namespace dish::job
     void wait();
 
 
-    std::string format_job_info(const std::string &status);
+    tiny_utf8::string format_job_info(const tiny_utf8::string &status);
 
     void continue_job();
     void update_status();

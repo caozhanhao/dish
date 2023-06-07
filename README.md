@@ -19,6 +19,7 @@ Dish
 ### Bundled
 - [fmtlib](https://github.com/fmtlib/fmt)
 - [sol2](https://github.com/ThePhD/sol2)
+- [tiny-utf8](https://github.com/DuffsDevice/tiny-utf8)
 
 ### Reference
 - [Implementing a Job Control Shell](https://www.gnu.org/software/libc/manual/html_node/Implementing-a-Shell.html)

@@ -19,12 +19,12 @@
 int main(int argc, char **argv)
 {
   dish::dish_init();
-  std::string history = dish::dish_context.lua_state["dish"]["history_path"];
+  tiny_utf8::string history = dish::dish_context.lua_state["dish"]["history_path"].get<std::string>();
   dish::line_editor::dle_init();
   dish::line_editor::load_history(history);
   while (dish::dish_context.running)
   {
-    std::string prompt;
+    tiny_utf8::string prompt;
     if (sol::protected_function h = dish::dish_context.lua_state["dish"]["prompt"]; h.valid())
     {
       auto res = h();
@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     }
     if(prompt.empty()) prompt = dish::dish_default_prompt();
 
-    std::string line = dish::line_editor::read_line(prompt);
+    tiny_utf8::string line = dish::line_editor::read_line(prompt);
     dish::run_command(line);
   }
   dish::line_editor::save_history(history);

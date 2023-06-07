@@ -19,7 +19,7 @@
 namespace dish::lexer
 {
   TokenType Token::get_type() const { return type; }
-  std::string Token::get_content() const { return content; }
+  tiny_utf8::string Token::get_content() const { return content; }
   std::size_t Token::get_pos() const { return pos; }
   std::size_t Token::get_size() const { return size; }
 }

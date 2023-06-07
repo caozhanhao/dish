@@ -15,6 +15,8 @@
 #define DISH_UTILS_HPP
 #pragma once
 
+#include "bundled/tinyutf8/tinyutf8.h"
+
 #include <list>
 #include <vector>
 #include <string>
@@ -24,7 +26,13 @@
 
 #define FMT_HEADER_ONLY
 #include "bundled/fmt/core.h"
+#include "bundled/fmt/xchar.h"
 
+template <> struct fmt::formatter<tiny_utf8::string> : formatter<std::string> {
+  auto format(tiny_utf8::string c, format_context& ctx) {
+    return formatter<std::string>::format(c.cpp_str(), ctx);
+  }
+};
 
 namespace dish::utils
 {
@@ -43,36 +51,35 @@ namespace dish::utils
   };
   struct Command
   {
-    std::string name;
+    tiny_utf8::string name;
     CommandType type;
     size_t file_size;
   };
 
-  std::string effect(const std::string &str, Effect effect);
+  tiny_utf8::string effect(const tiny_utf8::string &str, Effect effect);
   template<typename ...Args>
-  std::string effect(const std::string &str, Effect e, Args&& ...effects)
+  tiny_utf8::string effect(const tiny_utf8::string &str, Effect e, Args&& ...effects)
   {
     if (str.empty()) return "";
     return effect(effect(str, e), effects...);
   }
-  std::string red(const std::string &str);
-  std::string green(const std::string &str);
-  std::string yellow(const std::string &str);
-  std::string blue(const std::string &str);
-  std::string magenta(const std::string &str);
-  std::string cyan(const std::string &str);
-  std::string white(const std::string &str);
+  tiny_utf8::string red(const tiny_utf8::string &str);
+  tiny_utf8::string green(const tiny_utf8::string &str);
+  tiny_utf8::string yellow(const tiny_utf8::string &str);
+  tiny_utf8::string blue(const tiny_utf8::string &str);
+  tiny_utf8::string magenta(const tiny_utf8::string &str);
+  tiny_utf8::string cyan(const tiny_utf8::string &str);
+  tiny_utf8::string white(const tiny_utf8::string &str);
   
-  std::string get_dish_env(const std::string &s);
-  bool has_wildcards(const std::string &s);
+  tiny_utf8::string get_dish_env(const tiny_utf8::string &s);
+  bool has_wildcards(const tiny_utf8::string &s);
 
-  std::optional<std::string> get_home();
-  
-  std::optional<std::vector<std::string>> expand(const std::string &str);
+  std::optional<tiny_utf8::string> get_home();
+  std::optional<std::vector<tiny_utf8::string>> expand(const tiny_utf8::string &str);
   
 
-  template<typename T>
-  T split(std::string_view str, std::string_view delims = " ")
+  template<typename STR_VIEW, typename T>
+  T split(STR_VIEW str, STR_VIEW delims = " ")
   {
     T ret;
     size_t first = 0;
@@ -80,7 +87,7 @@ namespace dish::utils
     {
       const auto second = str.find_first_of(delims, first);
       if (first != second)
-        ret.insert(ret.end(), typename T::value_type{str.substr(first, second - first)});
+        ret.insert(ret.end(), typename T::value_type{std::string(str.substr(first, second - first))});
       if (second == std::string_view::npos)
         break;
       first = second + 1;
@@ -96,28 +103,40 @@ namespace dish::utils
     return *it;
   }
 
-  std::string get_timestamp();
-  
-  std::string to_string(CommandType ct);
+  tiny_utf8::string get_timestamp();
+
+  tiny_utf8::string to_string(CommandType ct);
 
   bool operator<(const Command& a, const Command& b);
 
   bool is_executable(const std::filesystem::path& path);
 
-  bool begin_with(const std::string& a, const std::string& b);
+  template<typename STR>
+  bool begin_with(const STR &a, const STR &b)
+  {
+    if (a.size() < b.size()) return false;
+    for (size_t i = 0; i < b.size(); ++i)
+    {
+      if (a[i] != b[i])
+        return false;
+    }
+    return true;
+  }
 
-  std::set<Command> match_command(const std::string& pattern);
+  std::set<Command> match_command(const tiny_utf8::string& pattern);
 
-  std::tuple<CommandType, std::string> find_command(const std::string& cmd);
+  std::tuple<CommandType, tiny_utf8::string> find_command(const tiny_utf8::string& cmd);
 
-  std::string get_human_readable_size(size_t sz);
+  tiny_utf8::string get_human_readable_size(size_t sz);
 
-  std::string simplify_path(const std::string &path);
+  tiny_utf8::string tilde(const tiny_utf8::string &path);
 
-  std::vector<std::string> match_files_and_dirs(const std::string& path);
+  std::vector<tiny_utf8::string> match_files_and_dirs(const tiny_utf8::string& path);
 
-  size_t get_length_without_ansi_escape(const std::string& str);
+  size_t display_size(const tiny_utf8::string& str);
 
-  std::string shrink_path(const std::string &path);
+  size_t display_length(const tiny_utf8::string &str);
+
+  tiny_utf8::string shrink_path(const tiny_utf8::string &path);
 }
 #endif

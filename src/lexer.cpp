@@ -122,7 +122,7 @@ namespace dish::lexer
           case TokenType::word:
           {
             auto fd = token.get_content();
-            for(auto& r : fd)
+            for(auto r : fd)
             {
               if(!std::isdigit(r))
               {
@@ -276,7 +276,7 @@ namespace dish::lexer
     else if (pos < text.size() && text[pos] == '$')
     {
       ++pos;
-      std::string tmp;
+      tiny_utf8::string tmp;
       if (text[pos] == '{')
       {
         ++pos;
@@ -311,7 +311,7 @@ namespace dish::lexer
       return Token{TokenType::end, "end", 0, 0};
     else
     {
-      std::string tmp;
+      tiny_utf8::string tmp;
       bool parsing_str = false;
       do
       {
@@ -325,18 +325,18 @@ namespace dish::lexer
     return Token{TokenType::end, "end", 0, 0};
   }
   
-  std::string Lexer::mark_error_from_token(const Token &token) const
+  tiny_utf8::string Lexer::mark_error_from_token(const Token &token) const
   {
     std::size_t size = token.get_size();
     std::size_t errpos = token.get_pos();
-    std::string marked = text;
+    tiny_utf8::string marked = text;
     marked += "\n";
     if (errpos >= size)
     {
-      marked += std::string(errpos - size, ' ');
+      marked += tiny_utf8::string(errpos - size, ' ');
     }
     marked += "\033[0;32;32m";
-    marked += std::string(size, '^');
+    marked += tiny_utf8::string(size, '^');
     marked += "\033[m\n";
     return marked;
   }

@@ -35,23 +35,23 @@ namespace dish::lexer
   {
   private:
     TokenType type;
-    std::string content;
+    tiny_utf8::string content;
     std::size_t pos;
     std::size_t size;
   public:
     Token() = default;
-    Token(TokenType type_, std::string content_, std::size_t pos_, std::size_t size_)
+    Token(TokenType type_, tiny_utf8::string content_, std::size_t pos_, std::size_t size_)
         : type(type_), content(std::move(content_)), pos(pos_), size(size_) {}
 
     TokenType get_type() const;
 
-    std::string get_content() const;
+    tiny_utf8::string get_content() const;
 
     std::size_t get_pos() const;
 
     std::size_t get_size() const;
 
-    void set_content(std::string c);
+    void set_content(tiny_utf8::string c);
   };
 }
 #endif

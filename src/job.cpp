@@ -35,7 +35,7 @@ namespace dish::job
   //Redirect
   bool Redirect::is_description() const { return redirect.index() == 0; }
 
-  std::string Redirect::get_filename() const { return std::get<std::string>(redirect); }
+  tiny_utf8::string Redirect::get_filename() const { return std::get<tiny_utf8::string>(redirect); }
 
   int Redirect::get_description() const { return std::get<int>(redirect); }
 
@@ -75,9 +75,14 @@ namespace dish::job
     }
     else if(type == ProcessType::lua_func)
     {
-      std::string script = fmt::format("print(dish.func.{}(\"{}\"))", args[0],
-                                       fmt::join(args.begin() + 1, args.end(), "\",\""));
-      dish_context.lua_state.script(script, &lua::dish_sol_error_handler);
+      tiny_utf8::string s;
+      for(size_t i = 1; i + 1 < args.size(); ++i)
+      {
+        s += args[i];
+        s += "\", \"";
+      }
+      tiny_utf8::string script = fmt::format("print(dish.func.{}(\"{}\"))", args[0], s);
+      dish_context.lua_state.script(script.cpp_str(), &lua::dish_sol_error_handler);
       completed = true;
       do_job_notification();
     }
@@ -122,7 +127,7 @@ namespace dish::job
       fmt::println(stderr, "Unknown process.");
   }
 
-  void Process::insert(std::string str)
+  void Process::insert(tiny_utf8::string str)
   {
     args.emplace_back(std::move(str));
   }
@@ -140,7 +145,7 @@ namespace dish::job
   std::vector<char *> Process::get_args() const
   {
     std::vector<char *> cargs;
-    auto convert = [](const std::string &s) -> char * { return const_cast<char *>(s.c_str()); };
+    auto convert = [](const tiny_utf8::string &s) -> char * { return const_cast<char *>(s.c_str()); };
     std::transform(args.begin(), args.end(), std::back_inserter(cargs), convert);
     cargs.emplace_back(static_cast<char *>(nullptr));
     return cargs;
@@ -176,7 +181,7 @@ namespace dish::job
     return 0;
   }
 
-  Job::Job(std::string cmd)
+  Job::Job(tiny_utf8::string cmd)
       : out(RedirectType::fd, 0), in(RedirectType::fd, 1),
         err(RedirectType::fd, 2), background(false), command_str(std::move(cmd)),
         notified(false), cmd_pgid(0)
@@ -291,7 +296,7 @@ namespace dish::job
       put_in_foreground(0);
     else
     {
-      fmt::println(format_job_info("launched"));
+      fmt::println(format_job_info("launched").cpp_str());
       put_in_background(0);
     }
     return 0;
@@ -445,7 +450,7 @@ namespace dish::job
     }
   }
 
-  [[nodiscard]]std::string Job::format_job_info(const std::string &status)
+  [[nodiscard]]tiny_utf8::string Job::format_job_info(const tiny_utf8::string &status)
   {
     return fmt::format("{} [{}]: {}", cmd_pgid, status, command_str);
   }

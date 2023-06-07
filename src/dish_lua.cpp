@@ -21,14 +21,14 @@ namespace dish::lua
   sol::protected_function_result dish_sol_error_handler(lua_State *L, sol::protected_function_result pfr)
   {
     std::exception_ptr eptr = std::current_exception();
-    std::string errmsg;
+    tiny_utf8::string errmsg;
     if (eptr) {
       try {
         std::rethrow_exception(eptr);
       } catch (const std::exception &ex) {
         errmsg += "std::exception -- ";
         errmsg.append(ex.what());
-      } catch (const std::string &message) {
+      } catch (const tiny_utf8::string &message) {
         errmsg += "message -- ";
         errmsg.append(message);
       } catch (const char *message) {
@@ -41,7 +41,7 @@ namespace dish::lua
     if (sol::type_of(L, pfr.stack_index()) == sol::type::string)
     {
       std::string_view serr = sol::stack::unqualified_get<std::string_view>(L, pfr.stack_index());
-      errmsg.append(serr.data(), serr.size());
+      errmsg.append(tiny_utf8::string (serr.data(), serr.size()));
     }
 
     fmt::println(stderr, "Dish Lua Error:\n{} error:\n{}",

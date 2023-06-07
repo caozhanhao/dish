@@ -22,7 +22,7 @@
 
 namespace dish::parser
 {
-  Parser::Parser(const std::string &cmd, std::vector<lexer::Token> tokens_) : command(cmd), tokens(tokens_), pos(0) {}
+  Parser::Parser(const tiny_utf8::string &cmd, std::vector<lexer::Token> tokens_) : command(cmd), tokens(tokens_), pos(0) {}
 
   int Parser::parse()
   {
@@ -54,7 +54,7 @@ namespace dish::parser
           // alias
           if (scmd.empty())
           {
-            auto it = dish_context.lua_state["dish"]["alias"][content];
+            auto it = dish_context.lua_state["dish"]["alias"][content.cpp_str()];
             if (it.valid())
             {
               tokens.erase(tokens.begin() + pos - 1);
@@ -118,11 +118,11 @@ namespace dish::parser
           pos += 2;
           break;
         case lexer::TokenType::lt_and://<&
-          cmd.set_in(job::Redirect{job::RedirectType::fd, std::stoi(tokens[pos + 1].get_content())});
+          cmd.set_in(job::Redirect{job::RedirectType::fd, std::stoi(tokens[pos + 1].get_content().cpp_str())});
           pos += 2;
           break;
         case lexer::TokenType::rt_and://>&
-          cmd.set_out(job::Redirect{job::RedirectType::fd, std::stoi(tokens[pos + 1].get_content())});
+          cmd.set_out(job::Redirect{job::RedirectType::fd, std::stoi(tokens[pos + 1].get_content().cpp_str())});
           pos += 2;
           break;
         case lexer::TokenType::lt_rt://<>

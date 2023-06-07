@@ -15,6 +15,7 @@
 #define DISH_BUILTIN_HPP
 #pragma once
 
+#include "utils.hpp"
 #include "dish_lua.hpp"
 
 #include <vector>
@@ -24,7 +25,7 @@
 
 namespace dish::builtin
 {
-  using Args = const std::vector<std::string> &;
+  using Args = const std::vector<tiny_utf8::string> &;
   using Func = std::function<int(Args)>;
 
   int builtin_cd(Args);
@@ -55,7 +56,7 @@ namespace dish::builtin
 
   int builtin_add_builtin(Args);
 
-  static const std::map<std::string, Func> builtins{
+  static const std::map<tiny_utf8::string, Func> builtins{
           {"cd", builtin_cd},
           {"pwd", builtin_pwd},
           {"export", builtin_export},

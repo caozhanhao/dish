@@ -37,7 +37,7 @@ namespace dish
 {
   dish::DishContext dish_context;
 
-  auto to_token(const std::string& cmd)
+  auto to_token(const tiny_utf8::string& cmd)
   {
     return lexer::Lexer(cmd).get_all_tokens_no_check().value();
   }
@@ -47,7 +47,7 @@ namespace dish
       do_job_notification();
   }
 
-  std::string dish_default_prompt()
+  tiny_utf8::string dish_default_prompt()
   {
     return (getuid() == 0 ? "#" : "$");
   }
@@ -107,14 +107,15 @@ namespace dish
     char **envir = environ;
     while (*envir)
     {
-      std::string tmp{*envir};
+      tiny_utf8::string tmp{*envir};
       auto eq = tmp.find('=');
-      if (eq == std::string::npos)
+      if (eq == tiny_utf8::string::npos)
       {
         fmt::println(stderr, "Unexpected env: {}", tmp);
         std::exit(-1);
       }
-      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq)] = tmp.substr(eq + 1);
+      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq).cpp_str()]
+              = tmp.substr(eq + 1).cpp_str();
       envir++;
     }
     dish_context.lua_state["dish"]["environment"]["PWD"] = std::filesystem::current_path().string();
@@ -133,21 +134,22 @@ namespace dish
     // ret
     dish_context.lua_state["dish"]["last_foreground_ret"] = sol::nil;
     // for cd -
-    dish_context.lua_state["dish"]["last_dir"] = utils::get_home();
+    dish_context.lua_state["dish"]["last_dir"] = utils::get_home()->cpp_str();
     // history
-    dish_context.lua_state["dish"]["history_path"] = "dish_history";
+    dish_context.lua_state["dish"]["history_path"] = utils::get_home()->cpp_str() + "/.local/share/dish/dish_history";
     dish_context.lua_state["dish_add_history"]=
             [](std::string timestamp, std::string cmd)
     {
-      line_editor::dle_context.history.emplace_back(line_editor::History{cmd, timestamp});
+      line_editor::dle_context.history.emplace_back
+              (line_editor::History{cmd, timestamp});
     };
     // promptsc
     dish_context.lua_state["dish"]["prompt"] = sol::nil;
     // prompt utils
-    dish_context.lua_state["dish_get_simplified_path"] =
-            [](){return utils::simplify_path(std::filesystem::current_path());};
+    dish_context.lua_state["dish_get_tilde_path"] =
+            [](){return utils::tilde(std::filesystem::current_path().string()).cpp_str();};
     dish_context.lua_state["dish_get_shrunk_path"] =
-            [](){return utils::shrink_path(utils::simplify_path(std::filesystem::current_path()));};
+            [](){return utils::shrink_path(utils::tilde(std::filesystem::current_path().string())).cpp_str();};
     // complete, hint
     dish_context.lua_state["dish"]["enable_hint"] = true;
     dish_context.lua_state["dish"]["hint"] = sol::nil;
@@ -190,10 +192,10 @@ namespace dish
     dish_context.lua_state["dish"]["effects"]["bg_white"] = 47;
 
     // load config
-    dish_context.lua_state.script_file("../src/dishrc.lua");
+    dish_context.lua_state.script_file(utils::get_home().value().cpp_str() + "/.config/dish/config.lua");
   }
   
-  void run_command(const std::string &cmd)
+  void run_command(const tiny_utf8::string &cmd)
   {
     lexer::Lexer lexer{cmd};
     auto tokens = lexer.get_all_tokens();
@@ -229,11 +231,11 @@ namespace dish
     return;
   }
 
-  std::vector<std::string> get_path(bool with_curr)
+  std::vector<tiny_utf8::string> get_path(bool with_curr)
   {
-    std::vector<std::string> ret;
+    std::vector<tiny_utf8::string> ret;
     if(auto p = dish_context.lua_state["dish"]["environment"]["PATH"]; p.valid())
-      ret = utils::split<std::vector<std::string>>(p.get<std::string>(), ":");
+      ret = utils::split<std::string_view, std::vector<tiny_utf8::string>>(p.get<std::string>(), ":");
     if(with_curr)
       ret.emplace_back(std::filesystem::current_path().string());
     return ret;

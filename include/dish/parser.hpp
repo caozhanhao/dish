@@ -31,7 +31,7 @@ namespace dish::parser
     std::vector<lexer::Token> tokens;
     std::size_t pos;
   public:
-    Parser(const std::string& cmd, std::vector<lexer::Token> tokens_);
+    Parser(const tiny_utf8::string& cmd, std::vector<lexer::Token> tokens_);
     
     int parse();
     

@@ -35,9 +35,9 @@ namespace dish::args
   struct Restrictor
   {
     std::function<bool(const T &)> restrictor;
-    std::string description;
+    tiny_utf8::string description;
 
-    Restrictor(std::function<bool(const T &)> restrictor_, std::string description_)
+    Restrictor(std::function<bool(const T &)> restrictor_, tiny_utf8::string description_)
         : restrictor(std::move(restrictor_)), description(std::move(description_))
     {}
 
@@ -75,43 +75,43 @@ namespace dish::args
             fmt::format("one of {}", fmt::join(s, ", "))};
   }
 
-  Restrictor<std::string> existing_path()
+  Restrictor<tiny_utf8::string> existing_path()
   {
-    return {[](const std::string &v) -> bool {
-              return std::filesystem::exists(v);
+    return {[](const tiny_utf8::string &v) -> bool {
+              return std::filesystem::exists(v.cpp_str());
             },
             "an existing path"};
   }
 
-  Restrictor<std::string> regex(const std::string &pattern)
+  Restrictor<tiny_utf8::string> regex(const tiny_utf8::string &pattern)
   {
-    return {[pattern](const std::string &v) -> bool {
-              return std::regex_match(v, std::regex{pattern});
+    return {[pattern](const tiny_utf8::string &v) -> bool {
+              return std::regex_match(v.cpp_str(), std::regex{pattern.cpp_str()});
             },
             pattern};
   }
 
-  Restrictor<std::string> email()
+  Restrictor<tiny_utf8::string> email()
   {
     return {regex("^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$").restrictor,
             "email"};
   }
 
   template<typename T>
-  std::optional<T> str_to(const std::string &s);
+  std::optional<T> str_to(const tiny_utf8::string &s);
 
   template<>
-  std::optional<std::string> str_to(const std::string &s)
+  std::optional<tiny_utf8::string> str_to(const tiny_utf8::string &s)
   {
     return s;
   }
 
   template<>
-  std::optional<double> str_to(const std::string &s)
+  std::optional<double> str_to(const tiny_utf8::string &s)
   {
     try
     {
-      return std::stod(s);
+      return std::stod(s.cpp_str());
     } catch (...)
     {
       fmt::println(stderr, "Warning: Unknown conversion of '{}' to double.", s);
@@ -121,11 +121,11 @@ namespace dish::args
   }
 
   template<>
-  std::optional<int> str_to(const std::string &s)
+  std::optional<int> str_to(const tiny_utf8::string &s)
   {
     try
     {
-      return std::stoi(s);
+      return std::stoi(s.cpp_str());
     } catch (...)
     {
       fmt::println(stderr, "Warning: Unknown conversion of '{}' to int.", s);
@@ -135,11 +135,11 @@ namespace dish::args
   }
 
   template<>
-  std::optional<long> str_to(const std::string &s)
+  std::optional<long> str_to(const tiny_utf8::string &s)
   {
     try
     {
-      return std::stol(s);
+      return std::stol(s.cpp_str());
     } catch (...)
     {
       fmt::println(stderr, "Warning: Unknown conversion of '{}' to long.", s);
@@ -149,11 +149,11 @@ namespace dish::args
   }
 
   template<>
-  std::optional<long long> str_to(const std::string &s)
+  std::optional<long long> str_to(const tiny_utf8::string &s)
   {
     try
     {
-      return std::stoll(s);
+      return std::stoll(s.cpp_str());
     } catch (...)
     {
       fmt::println(stderr, "Warning: Unknown conversion of '{}' to long long.", s);
@@ -163,11 +163,11 @@ namespace dish::args
   }
 
   template<>
-  std::optional<long double> str_to(const std::string &s)
+  std::optional<long double> str_to(const tiny_utf8::string &s)
   {
     try
     {
-      return std::stold(s);
+      return std::stold(s.cpp_str());
     } catch (...)
     {
       fmt::println(stderr, "Warning: Unknown conversion of '{}' to long double.", s);
@@ -177,11 +177,11 @@ namespace dish::args
   }
 
   template<>
-  std::optional<unsigned long> str_to(const std::string &s)
+  std::optional<unsigned long> str_to(const tiny_utf8::string &s)
   {
     try
     {
-      return std::stoul(s);
+      return std::stoul(s.cpp_str());
     } catch (...)
     {
       fmt::println(stderr, "Warning: Unknown conversion of '{}' to unsigned long.", s);
@@ -191,11 +191,11 @@ namespace dish::args
   }
 
   template<>
-  std::optional<unsigned long long> str_to(const std::string &s)
+  std::optional<unsigned long long> str_to(const tiny_utf8::string &s)
   {
     try
     {
-      return std::stoull(s);
+      return std::stoull(s.cpp_str());
     } catch (...)
     {
       fmt::println(stderr, "Warning: Unknown conversion of '{}' to unsigned long long.", s);
@@ -205,7 +205,7 @@ namespace dish::args
   }
 
   template<>
-  std::optional<bool> str_to(const std::string &s)
+  std::optional<bool> str_to(const tiny_utf8::string &s)
   {
     if (s == "true" || s == "True" || s == "TRUE")
       return true;
@@ -318,18 +318,18 @@ namespace dish::args
   template<typename List>
   constexpr size_t size_of_v = size_of<List>::value;
 
-  using ArgsTypeList = TypeList<std::monostate, bool, int, double, std::string>;
+  using ArgsTypeList = TypeList<std::monostate, bool, int, double, tiny_utf8::string>;
   using ArgsType = decltype(as_variant(ArgsTypeList{}));
   using RestrictorVariant = decltype(as_restrictor_variant(ArgsTypeList{}));
 
-  std::string get_typename(int index)
+  tiny_utf8::string get_typename(int index)
   {
     if (index == -1 || index >= size_of_v<ArgsTypeList>) return "unknown";
-    static std::vector names{"null", "bool", "int", "double", "std::string"};
+    static std::vector names{"null", "bool", "int", "double", "tiny_utf8::string"};
     return names[index];
   }
   template<typename T>
-  std::string get_restrictor_description_helper(const RestrictorVariant &restrictors)
+  tiny_utf8::string get_restrictor_description_helper(const RestrictorVariant &restrictors)
   {
     if (restrictors.index() == 0 || restrictors.valueless_by_exception())
       return "";
@@ -338,9 +338,9 @@ namespace dish::args
       return restrictor.description;
     return "";
   }
-  std::string get_restrictor_description(const std::vector<RestrictorVariant> &restrictors)
+  tiny_utf8::string get_restrictor_description(const std::vector<RestrictorVariant> &restrictors)
   {
-    std::string ret;
+    tiny_utf8::string ret;
     for (auto &restrictor: restrictors)
     {
       switch (restrictor.index())
@@ -354,8 +354,8 @@ namespace dish::args
         case index_of_v<double, ArgsTypeList>:
           ret += get_restrictor_description_helper<double>(restrictor);
           break;
-        case index_of_v<std::string, ArgsTypeList>:
-          ret += get_restrictor_description_helper<std::string>(restrictor);
+        case index_of_v<tiny_utf8::string, ArgsTypeList>:
+          ret += get_restrictor_description_helper<tiny_utf8::string>(restrictor);
           break;
       }
       ret += ", ";
@@ -367,7 +367,7 @@ namespace dish::args
     }
     return ret;
   }
-  std::string to_str(const ArgsType &val)
+  tiny_utf8::string to_str(const ArgsType &val)
   {
     if (val.valueless_by_exception()) return "valueless";
     switch (val.index())
@@ -384,8 +384,8 @@ namespace dish::args
       case index_of_v<double, ArgsTypeList>:
         return std::to_string(std::get<double>(val));
         break;
-      case index_of_v<std::string, ArgsTypeList>:
-        return std::get<std::string>(val);
+      case index_of_v<tiny_utf8::string, ArgsTypeList>:
+        return std::get<tiny_utf8::string>(val);
         break;
     }
     return "unexpected";
@@ -396,9 +396,9 @@ namespace dish::args
   private:
     struct Option
     {
-      std::string long_name;
-      std::string short_name;
-      std::string description;
+      tiny_utf8::string long_name;
+      tiny_utf8::string short_name;
+      tiny_utf8::string description;
 
       int expected_type;
       std::vector<RestrictorVariant> restrictors;
@@ -408,7 +408,7 @@ namespace dish::args
 
       std::function<void()> func;
 
-      Option(int expected_type_, std::vector<RestrictorVariant> restrictors_, std::string long_name_, std::string short_name_,
+      Option(int expected_type_, std::vector<RestrictorVariant> restrictors_, tiny_utf8::string long_name_, tiny_utf8::string short_name_,
              ArgsType default_value = std::monostate{})
           : expected_type(expected_type_), short_name(std::move(short_name_)),
             long_name(std::move(long_name_)),
@@ -416,7 +416,7 @@ namespace dish::args
             restrictors(restrictors_)
       {}
 
-      Option(std::string long_name_, std::string short_name_,
+      Option(tiny_utf8::string long_name_, tiny_utf8::string short_name_,
              std::function<void()> func_)
           : short_name(std::move(short_name_)),
             long_name(std::move(long_name_)),
@@ -441,7 +441,7 @@ namespace dish::args
         }
         return std::nullopt;
       }
-      Option &add_description(const std::string &description_)
+      Option &add_description(const tiny_utf8::string &description_)
       {
         description = description_;
         return *this;
@@ -453,14 +453,14 @@ namespace dish::args
       }
     };
     std::vector<Option> options;
-    std::map<std::string, size_t> long_name_index;
-    std::map<std::string, size_t> short_name_index;
-    std::string name;
-    std::string description;
+    std::map<tiny_utf8::string, size_t> long_name_index;
+    std::map<tiny_utf8::string, size_t> short_name_index;
+    tiny_utf8::string name;
+    tiny_utf8::string description;
 
   public:
     template<typename T>
-    Option &add_option(const std::string &long_name, const std::string &short_name = "",
+    Option &add_option(const tiny_utf8::string &long_name, const tiny_utf8::string &short_name = "",
                        const ArgsType &default_value = std::monostate{})
     {
       static_assert(contains_v<std::decay_t<T>, ArgsTypeList> && !std::is_same_v<std::monostate, T>, "Unsupported Type.");
@@ -472,7 +472,7 @@ namespace dish::args
       return options.back();
     }
 
-    Option &add_boolean_option(const std::string &long_name, const std::string &short_name = "")
+    Option &add_boolean_option(const tiny_utf8::string &long_name, const tiny_utf8::string &short_name = "")
     {
       options.emplace_back(Option(index_of_v<bool, ArgsTypeList>, {},
                                   long_name, short_name, true));
@@ -482,7 +482,7 @@ namespace dish::args
       return options.back();
     }
 
-    Option &add_func_option(const std::string &long_name, const std::string &short_name,
+    Option &add_func_option(const tiny_utf8::string &long_name, const tiny_utf8::string &short_name,
                        const std::function<void()> &func)
     {
       options.emplace_back(Option(long_name, short_name, func));
@@ -492,12 +492,12 @@ namespace dish::args
       return options.back();
     }
 
-    Option &add_help(const std::string &long_name, const std::string &short_name)
+    Option &add_help(const tiny_utf8::string &long_name, const tiny_utf8::string &short_name)
     {
       auto help = [this] {
         fmt::println("usage: {} [option] ...", name);
         if (!description.empty())
-          fmt::println(description);
+          fmt::println(description.cpp_str());
         fmt::println("options:");
         for (auto &r: long_name_index)
         {
@@ -534,19 +534,19 @@ namespace dish::args
       return options.back();
     }
 
-    ArgsParser &add_description(const std::string &description_)
+    ArgsParser &add_description(const tiny_utf8::string &description_)
     {
       description = description_;
       return *this;
     }
 
-    ArgsParser &set_name(const std::string &name_)
+    ArgsParser &set_name(const tiny_utf8::string &name_)
     {
       name = name_;
       return *this;
     }
 
-    ArgsParser &parse(const std::vector<std::string> &args)
+    ArgsParser &parse(const std::vector<tiny_utf8::string> &args)
     {
       if (args.size() == 0)
         return *this;
@@ -614,8 +614,8 @@ namespace dish::args
               case index_of_v<double, ArgsTypeList>:
                 parse_value_helper<double>(curr, args[i]);
                 break;
-              case index_of_v<std::string, ArgsTypeList>:
-                parse_value_helper<std::string>(curr, args[i]);
+              case index_of_v<tiny_utf8::string, ArgsTypeList>:
+                parse_value_helper<tiny_utf8::string>(curr, args[i]);
                 break;
             }
           }
@@ -625,7 +625,7 @@ namespace dish::args
     }
 
     template<typename T>
-    bool has(const std::string &name)
+    bool has(const tiny_utf8::string &name)
     {
       auto opt = match(name);
       if (opt == nullptr)
@@ -634,7 +634,7 @@ namespace dish::args
     }
 
     template<typename T>
-    std::optional<T> get(const std::string &name)
+    std::optional<T> get(const tiny_utf8::string &name)
     {
       auto opt = match(name);
       if (opt == nullptr)
@@ -643,7 +643,7 @@ namespace dish::args
     }
 
   private:
-    Option *match(const std::string &name)
+    Option *match(const tiny_utf8::string &name)
     {
       Option *opt = nullptr;
       auto its = short_name_index.find(name);
@@ -659,7 +659,7 @@ namespace dish::args
       return opt;
     }
     template<typename T>
-    void parse_value_helper(Option *curr, const std::string &s)
+    void parse_value_helper(Option *curr, const tiny_utf8::string &s)
     {
       auto opt = str_to<T>(s);
       if (opt.has_value())

@@ -32,11 +32,11 @@ namespace dish::lexer
   class Lexer
   {
   private:
-    std::string text;
+    tiny_utf8::string text;
     std::size_t pos;
     CmdState cmd_state;
   public:
-    Lexer(std::string cmd) : text(cmd), pos(0) {}
+    Lexer(tiny_utf8::string cmd) : text(cmd), pos(0) {}
   
     std::optional<std::vector<Token>> get_all_tokens();
 
@@ -47,7 +47,7 @@ namespace dish::lexer
     
     int check_cmd(const Token &token);
     
-    std::string mark_error_from_token(const Token &token) const;
+    tiny_utf8::string mark_error_from_token(const Token &token) const;
   };
 }
 #endif
