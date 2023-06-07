@@ -62,6 +62,17 @@ namespace dish::line_editor
     return (c >= 0 && c <= 6) || (c >= 8 && c <= 14) || c == 16 || c == 20 || c == 21 || c == 23 || c == 27 || c == 127;
   }
 
+  void dle_write(const std::string& str)
+  {
+    std::cout.write(str.c_str(), str.size());
+  }
+
+  template<typename ...Args>
+  void dle_write(const std::string& fmt, Args&& ...args)
+  {
+    dle_write(fmt::format(fmt, std::forward<Args>(args)...));
+  }
+
   void dle_init()
   {
     dle_context.pos = 1;
@@ -198,6 +209,7 @@ namespace dish::line_editor
       before_pattern = dle_context.line;
       if(!before_pattern.empty()) before_pattern.pop_back();
     }
+
     // lua hint
     if (sol::protected_function h = dish_context.lua_state["dish"]["hint"]; h.valid())
     {
@@ -226,7 +238,7 @@ namespace dish::line_editor
     return "";
   }
   void complete_refresh();
-  void cmdline_refresh(bool with_hints = true)
+  void cmdline_refresh(bool with_hints)
   {
     std::string esc;
     // move to begin and clear the line
@@ -255,7 +267,7 @@ namespace dish::line_editor
     dle_context.last_refresh_pos = dle_context.pos;
     fmt::print(esc);
   }
-  void edit_refresh_line(bool with_hints = true)
+  void edit_refresh_line(bool with_hints)
   {
     if (dle_context.completion.empty())
       cmdline_refresh(with_hints);
@@ -491,7 +503,7 @@ namespace dish::line_editor
     std::string esc = "\n";
     for (size_t i = 0; i < lines; ++i)
       esc += "\n\x1b[2K";
-    esc += fmt::format("{}\x1b[{}F", esc, lines);
+    fmt::print("{}\x1b[{}F", esc, lines);
     for (size_t c = 0; c < columns; ++c)
     {
       for (size_t l = 0; l < lines; ++l)
@@ -518,20 +530,19 @@ namespace dish::line_editor
               out += line.substr(dle_context.complete_pattern.size());
           }
         }
-        esc += fmt::format("{}\x1b[{}D\x1b[1B", out, utils::get_length_without_ansi_escape(line));
+        fmt::print("{}\x1b[{}D\x1b[1B", out, utils::get_length_without_ansi_escape(line));
       }
       if (c < columns - 1)
-        esc += fmt::format("\x1b[{}A\x1b[{}C", lines, size + 2);
+        fmt::print("\x1b[{}A\x1b[{}C", lines, size + 2);
     }
 
     if(dle_context.searching_completion)
       complete_apply();
     // move cursor back
-    esc += fmt::format("\x1b[{}F", lines + 1);
+    fmt::print("\x1b[{}F", lines + 1);
     if (auto i = get_columns_before_complete(); i != 0)
-      esc += fmt::format("\x1b[{}C", i);
-    fmt::print(esc);
-    cmdline_refresh();
+      fmt::print("\x1b[{}C", i);
+    cmdline_refresh(dish_context.lua_state["dish"]["enable_hint"]);
   }
 
   void complete_clear()
@@ -576,7 +587,7 @@ namespace dish::line_editor
     dle_context.pos = dle_context.line.size();
     fmt::print("\x1b[{}C", dle_context.pos - origin);
     dle_context.last_refresh_pos = dle_context.pos;
-    if (refresh) edit_refresh_line();
+    if (refresh) edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
   }
 
   void move_to_word_beginning()
@@ -631,7 +642,7 @@ namespace dish::line_editor
   {
     if (dle_context.pos >= dle_context.line.size()) return;
     dle_context.line.erase(dle_context.pos, 1);
-    edit_refresh_line();
+    edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
   }
 
   void edit_backspace()
@@ -639,7 +650,7 @@ namespace dish::line_editor
     if (dle_context.pos == 0) return;
     dle_context.line.erase(dle_context.pos - 1, 1);
     --dle_context.pos;
-    edit_refresh_line();
+    edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
   }
 
   void edit_delete_next_word()
@@ -653,7 +664,7 @@ namespace dish::line_editor
     while (i < dle_context.line.size() && dle_context.line[i] != ' ')
       ++i;
     dle_context.line.erase(dle_context.pos + 1, i - dle_context.pos);
-    edit_refresh_line();
+    edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
   }
 
   void edit_history_helper(bool prev)
@@ -706,7 +717,7 @@ namespace dish::line_editor
       next_history();
     dle_context.line = dle_context.history[dle_context.history_pos].cmd;
     dle_context.pos = dle_context.line.size();
-    edit_refresh_line();
+    edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
     move_to_end();
   }
 
@@ -766,7 +777,7 @@ namespace dish::line_editor
           if (dle_context.completion.empty())
           {
             complete_line();
-            edit_refresh_line();
+            edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
           }
           else
           {
@@ -788,7 +799,7 @@ namespace dish::line_editor
               }
             }
             dle_context.searching_completion = true;
-            edit_refresh_line();
+            edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
           }
           continue;
         }
@@ -842,7 +853,7 @@ namespace dish::line_editor
             if(!dle_context.completion.empty())
             {
               complete_select();
-              edit_refresh_line();
+              edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
             }
             else
             {
@@ -1019,7 +1030,7 @@ namespace dish::line_editor
         dle_context.completion_pos_line = 0;
         dle_context.completion_pos_column = 0;
         ++dle_context.pos;
-        edit_refresh_line();
+        edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
       }
     }
     return -1;

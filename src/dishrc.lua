@@ -108,6 +108,8 @@ function hint(before_pattern, pattern)
         end
     end
 end
+
+dish.enable_hint = true
 dish.hint = hint;
 
 function complete(before_pattern, pattern)

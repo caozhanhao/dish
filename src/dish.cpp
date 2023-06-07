@@ -149,6 +149,7 @@ namespace dish
     dish_context.lua_state["dish_get_shrunk_path"] =
             [](){return utils::shrink_path(utils::simplify_path(std::filesystem::current_path()));};
     // complete, hint
+    dish_context.lua_state["dish"]["enable_hint"] = true;
     dish_context.lua_state["dish"]["hint"] = sol::nil;
     dish_context.lua_state["dish"]["complete"] = sol::nil;
     // Dish Line Editor style
