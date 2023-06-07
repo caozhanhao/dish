@@ -52,95 +52,17 @@ namespace dish
     return (getuid() == 0 ? "#" : "$");
   }
 
+  // Dish initialize
   void dish_init()
   {
     dish_context.running = true;
-    dish_context.lua_state.open_libraries(sol::lib::base, sol::lib::string,
-                                          sol::lib::coroutine, sol::lib::os,
-                                          sol::lib::io, sol::lib::math,
-                                          sol::lib::table, sol::lib::bit32);
-    dish_context.lua_state.set_exception_handler(lua::dish_sol_exception_handler);
-    dish_context.lua_state["dish"] = dish_context.lua_state.create_table();
-    dish_context.lua_state["dish"]["environment"] = dish_context.lua_state.create_table();
-    dish_context.lua_state["dish"]["alias"] = dish_context.lua_state.create_table();
-    dish_context.lua_state["dish"]["func"] = dish_context.lua_state.create_table();
-    dish_context.lua_state["dish"]["last_foreground_ret"] = sol::nil;
-    dish_context.lua_state["dish"]["last_dir"] = utils::get_home();
-    dish_context.lua_state["dish"]["history_path"] = "dish_history";
-    dish_context.lua_state["dish"]["prompt"] = sol::nil;
-    dish_context.lua_state["dish"]["hint"] = sol::nil;
-    dish_context.lua_state["dish"]["complete"] = sol::nil;
-    dish_context.lua_state["dish"]["style"] = dish_context.lua_state.create_table();
-    dish_context.lua_state["dish"]["style"]["cmd"] = static_cast<int>(utils::Effect::fg_blue);
-    dish_context.lua_state["dish"]["style"]["arg"] = static_cast<int>(utils::Effect::fg_cyan);
-    dish_context.lua_state["dish"]["style"]["string"] = static_cast<int>(utils::Effect::fg_yellow);
-    dish_context.lua_state["dish"]["style"]["env"] = static_cast<int>(utils::Effect::fg_green);
-    dish_context.lua_state["dish"]["style"]["error"] = static_cast<int>(utils::Effect::fg_red);
-    //    clear = 0, bold, faint, italic, underline, slow_blink, rapid_blink, color_reverse,
-    //    fg_black = 30, fg_red, fg_green, fg_yellow, fg_blue, fg_magenta, fg_cyan, fg_white,
-    //    bg_black = 40, bg_red, bg_green, bg_yellow, bg_blue, bg_magenta, bg_cyan, bg_white
-    dish_context.lua_state["dish"]["effects"] = dish_context.lua_state.create_table();
-    dish_context.lua_state["dish"]["effects"]["clear"] = 0;
-    dish_context.lua_state["dish"]["effects"]["bold"] = 1;
-    dish_context.lua_state["dish"]["effects"]["faint"] = 2;
-    dish_context.lua_state["dish"]["effects"]["italic"] = 3;
-    dish_context.lua_state["dish"]["effects"]["underline"] = 4;
-    dish_context.lua_state["dish"]["effects"]["slow_blink"] = 5;
-    dish_context.lua_state["dish"]["effects"]["rapid_blink"] = 6;
-    dish_context.lua_state["dish"]["effects"]["color_reverse"] = 7;
-    dish_context.lua_state["dish"]["effects"]["fg_black"] = 30;
-    dish_context.lua_state["dish"]["effects"]["fg_red"] = 31;
-    dish_context.lua_state["dish"]["effects"]["fg_green"] = 32;
-    dish_context.lua_state["dish"]["effects"]["fg_yellow"] = 33;
-    dish_context.lua_state["dish"]["effects"]["fg_blue"] = 34;
-    dish_context.lua_state["dish"]["effects"]["fg_magenta"] = 34;
-    dish_context.lua_state["dish"]["effects"]["fg_cyan"] = 36;
-    dish_context.lua_state["dish"]["effects"]["fg_white"] = 37;
-    dish_context.lua_state["dish"]["effects"]["bg_black"] = 40;
-    dish_context.lua_state["dish"]["effects"]["bg_red"] = 41;
-    dish_context.lua_state["dish"]["effects"]["bg_green"] = 42;
-    dish_context.lua_state["dish"]["effects"]["bg_yellow"] = 43;
-    dish_context.lua_state["dish"]["effects"]["bg_blue"] = 44;
-    dish_context.lua_state["dish"]["effects"]["bg_magenta"] = 45;
-    dish_context.lua_state["dish"]["effects"]["bg_cyan"] = 46;
-    dish_context.lua_state["dish"]["effects"]["bg_white"] = 47;
 
-    dish_context.lua_state["dish_add_history"]=
-        [](std::string timestamp, std::string cmd)
-    {
-      line_editor::dle_context.history.emplace_back(line_editor::History{cmd, timestamp});
-    };
-
+    //
+    // Terminal
+    //
     dish_context.waiting = false;
     dish_context.terminal = STDIN_FILENO;
     dish_context.is_interactive = isatty(dish_context.terminal);
-
-    char **envir = environ;
-    while (*envir)
-    {
-      std::string tmp{*envir};
-      auto eq = tmp.find('=');
-      if (eq == std::string::npos)
-      {
-        fmt::println(stderr, "Unexpected env: {}", tmp);
-        std::exit(-1);
-      }
-      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq)] = tmp.substr(eq + 1);
-      envir++;
-    }
-
-    dish_context.lua_state["dish"]["environment"]["PWD"] = std::filesystem::current_path().string();
-    dish_context.lua_state["dish"]["environment"]["USERNAME"] = getpwuid(getuid())->pw_name;
-    dish_context.lua_state["dish"]["environment"]["HOME"] = getpwuid(getuid())->pw_dir;
-    dish_context.lua_state["dish"]["environment"]["UID"] = std::to_string(getuid());
-
-    if (!dish_context.lua_state["dish"]["environment"]["PATH"].valid())
-    {
-      dish_context.lua_state["dish"]["environment"]["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
-    }
-
-    dish_context.lua_state.script_file("../src/dishrc.lua");
-
     if (dish_context.is_interactive)
     {
       while (tcgetpgrp(dish_context.terminal) != (dish_context.pgid = getpgrp()))
@@ -169,6 +91,105 @@ namespace dish
       dish_context.tmodes.c_cc[VTIME] = 0;
       tcsetattr(dish_context.terminal, TCSAFLUSH, &dish_context.tmodes);
     }
+
+    //
+    // Lua
+    //
+    dish_context.lua_state.open_libraries(sol::lib::base, sol::lib::string,
+                                          sol::lib::coroutine, sol::lib::os,
+                                          sol::lib::io, sol::lib::math,
+                                          sol::lib::table, sol::lib::bit32);
+    dish_context.lua_state.set_exception_handler(lua::dish_sol_exception_handler);
+    // basic table
+    dish_context.lua_state["dish"] = dish_context.lua_state.create_table();
+    // environment
+    dish_context.lua_state["dish"]["environment"] = dish_context.lua_state.create_table();
+    char **envir = environ;
+    while (*envir)
+    {
+      std::string tmp{*envir};
+      auto eq = tmp.find('=');
+      if (eq == std::string::npos)
+      {
+        fmt::println(stderr, "Unexpected env: {}", tmp);
+        std::exit(-1);
+      }
+      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq)] = tmp.substr(eq + 1);
+      envir++;
+    }
+    dish_context.lua_state["dish"]["environment"]["PWD"] = std::filesystem::current_path().string();
+    dish_context.lua_state["dish"]["environment"]["USERNAME"] = getpwuid(getuid())->pw_name;
+    dish_context.lua_state["dish"]["environment"]["HOME"] = getpwuid(getuid())->pw_dir;
+    dish_context.lua_state["dish"]["environment"]["UID"] = std::to_string(getuid());
+
+    if (!dish_context.lua_state["dish"]["environment"]["PATH"].valid())
+    {
+      dish_context.lua_state["dish"]["environment"]["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+    }
+    // alias
+    dish_context.lua_state["dish"]["alias"] = dish_context.lua_state.create_table();
+    // lua function
+    dish_context.lua_state["dish"]["func"] = dish_context.lua_state.create_table();
+    // ret
+    dish_context.lua_state["dish"]["last_foreground_ret"] = sol::nil;
+    // for cd -
+    dish_context.lua_state["dish"]["last_dir"] = utils::get_home();
+    // history
+    dish_context.lua_state["dish"]["history_path"] = "dish_history";
+    dish_context.lua_state["dish_add_history"]=
+            [](std::string timestamp, std::string cmd)
+    {
+      line_editor::dle_context.history.emplace_back(line_editor::History{cmd, timestamp});
+    };
+    // promptsc
+    dish_context.lua_state["dish"]["prompt"] = sol::nil;
+    // prompt utils
+    dish_context.lua_state["dish_get_simplified_path"] =
+            [](){return utils::simplify_path(std::filesystem::current_path());};
+    dish_context.lua_state["dish_get_shrunk_path"] =
+            [](){return utils::shrink_path(utils::simplify_path(std::filesystem::current_path()));};
+    // complete, hint
+    dish_context.lua_state["dish"]["hint"] = sol::nil;
+    dish_context.lua_state["dish"]["complete"] = sol::nil;
+    // Dish Line Editor style
+    dish_context.lua_state["dish"]["style"] = dish_context.lua_state.create_table();
+    dish_context.lua_state["dish"]["style"]["cmd"] = static_cast<int>(utils::Effect::fg_blue);
+    dish_context.lua_state["dish"]["style"]["arg"] = static_cast<int>(utils::Effect::fg_cyan);
+    dish_context.lua_state["dish"]["style"]["string"] = static_cast<int>(utils::Effect::fg_yellow);
+    dish_context.lua_state["dish"]["style"]["env"] = static_cast<int>(utils::Effect::fg_green);
+    dish_context.lua_state["dish"]["style"]["error"] = static_cast<int>(utils::Effect::fg_red);
+    dish_context.lua_state["dish"]["style"]["info"] = static_cast<int>(utils::Effect::fg_magenta);
+    // effects for style
+    // bold = 1, faint, italic, underline, slow_blink, rapid_blink, color_reverse,
+    // fg_black = 30, fg_red, fg_green, fg_yellow, fg_blue, fg_magenta, fg_cyan, fg_white,
+    // bg_black = 40, bg_red, bg_green, bg_yellow, bg_blue, bg_magenta, bg_cyan, bg_white
+    dish_context.lua_state["dish"]["effects"] = dish_context.lua_state.create_table();
+    dish_context.lua_state["dish"]["effects"]["bold"] = 1;
+    dish_context.lua_state["dish"]["effects"]["faint"] = 2;
+    dish_context.lua_state["dish"]["effects"]["italic"] = 3;
+    dish_context.lua_state["dish"]["effects"]["underline"] = 4;
+    dish_context.lua_state["dish"]["effects"]["slow_blink"] = 5;
+    dish_context.lua_state["dish"]["effects"]["rapid_blink"] = 6;
+    dish_context.lua_state["dish"]["effects"]["color_reverse"] = 7;
+    dish_context.lua_state["dish"]["effects"]["fg_black"] = 30;
+    dish_context.lua_state["dish"]["effects"]["fg_red"] = 31;
+    dish_context.lua_state["dish"]["effects"]["fg_green"] = 32;
+    dish_context.lua_state["dish"]["effects"]["fg_yellow"] = 33;
+    dish_context.lua_state["dish"]["effects"]["fg_blue"] = 34;
+    dish_context.lua_state["dish"]["effects"]["fg_magenta"] = 34;
+    dish_context.lua_state["dish"]["effects"]["fg_cyan"] = 36;
+    dish_context.lua_state["dish"]["effects"]["fg_white"] = 37;
+    dish_context.lua_state["dish"]["effects"]["bg_black"] = 40;
+    dish_context.lua_state["dish"]["effects"]["bg_red"] = 41;
+    dish_context.lua_state["dish"]["effects"]["bg_green"] = 42;
+    dish_context.lua_state["dish"]["effects"]["bg_yellow"] = 43;
+    dish_context.lua_state["dish"]["effects"]["bg_blue"] = 44;
+    dish_context.lua_state["dish"]["effects"]["bg_magenta"] = 45;
+    dish_context.lua_state["dish"]["effects"]["bg_cyan"] = 46;
+    dish_context.lua_state["dish"]["effects"]["bg_white"] = 47;
+
+    // load config
+    dish_context.lua_state.script_file("../src/dishrc.lua");
   }
   
   void run_command(const std::string &cmd)

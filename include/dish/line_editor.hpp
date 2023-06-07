@@ -48,8 +48,8 @@ namespace dish::line_editor
     // complete
     std::string prompt;
     size_t screen_width;
-    // color cmd(ANSI Escape Code), raw cmd
-    std::vector<std::vector<std::tuple<std::string, std::string>>> completion;
+    std::string complete_pattern; // for highlight
+    std::vector<std::vector<std::tuple<std::string, std::string>>> completion; // output, raw_cmd
     bool searching_completion;
     size_t completion_pos_line;
     size_t completion_pos_column;

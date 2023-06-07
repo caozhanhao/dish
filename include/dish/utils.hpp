@@ -32,7 +32,8 @@ namespace dish::utils
   {
     bold = 1, faint, italic, underline, slow_blink, rapid_blink, color_reverse,
     fg_black = 30, fg_red, fg_green, fg_yellow, fg_blue, fg_magenta, fg_cyan, fg_white,
-    bg_black = 40, bg_red, bg_green, bg_yellow, bg_blue, bg_magenta, bg_cyan, bg_white
+    bg_black = 40, bg_red, bg_green, bg_yellow, bg_blue, bg_magenta, bg_cyan, bg_white,
+    bg_shadow, bg_strong_shadow
   };
   
   enum class CommandType
@@ -69,7 +70,6 @@ namespace dish::utils
   
   std::optional<std::vector<std::string>> expand(const std::string &str);
   
-  std::string simplify_path(const std::string &path);
 
   template<typename T>
   T split(std::string_view str, std::string_view delims = " ")
@@ -112,8 +112,12 @@ namespace dish::utils
 
   std::string get_human_readable_size(size_t sz);
 
+  std::string simplify_path(const std::string &path);
+
   std::vector<std::string> match_files_and_dirs(const std::string& path);
 
   size_t get_length_without_ansi_escape(const std::string& str);
+
+  std::string shrink_path(const std::string &path);
 }
 #endif

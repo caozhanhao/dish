@@ -36,18 +36,21 @@
 
 namespace dish::utils
 {
-
-
   std::string effect(const std::string &str, Effect effect_)
   {
     if (str.empty()) return "";
+    if(effect_ == utils::Effect::bg_shadow)
+      return fmt::format("\033[48;5;7m{}\033[49m", str);
+    else if(effect_ == utils::Effect::bg_strong_shadow)
+      return fmt::format("\033[48;5;8m{}\033[49m", str);
+
     int effect = static_cast<int>(effect_);
     int end = 0;
-    if(effect >= 1 && effect <= 7)
-      end = effect + 20;
-    else if(effect >= 30 && effect <= 37)
+    if (effect >= 1 && effect <= 7)
+      end = 0;
+    else if (effect >= 30 && effect <= 37)
       end = 39;
-    else if(effect >= 40 && effect <= 47)
+    else if (effect >= 40 && effect <= 47)
       end = 49;
     return fmt::format("\033[{}m{}\033[{}m", effect, str, end);
   }
@@ -189,19 +192,6 @@ namespace dish::utils
     return {{s}};
   }
 
-  std::string simplify_path(const std::string &path)
-  {
-    auto home_opt = get_home();
-    if (!home_opt.has_value()) return path;
-    auto home = home_opt.value();
-    auto [it1, it2] = std::mismatch(path.cbegin(), path.cend(), home.cbegin(), home.cend());
-    if (it2 == home.cend())
-    {
-      return "~" + path.substr(home.size());
-    }
-    return path;
-  }
-
   std::string get_timestamp()
   {
     auto tp = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now());
@@ -331,6 +321,19 @@ namespace dish::utils
     return fmt::format("{}{}", mantissa, "BKMGTPE"[i]);
   }
 
+  std::string simplify_path(const std::string &path_)
+  {
+    std::string path = std::filesystem::path(path_).lexically_normal();
+    auto home_opt = get_home();
+    if (!home_opt.has_value()) return path;
+    auto home = home_opt.value();
+    auto [it1, it2] = std::mismatch(path.cbegin(), path.cend(), home.cbegin(), home.cend());
+    if (it2 == home.cend())
+      return "~" + path.substr(home.size());
+    return path;
+  }
+
+
   std::vector<std::string> match_files_and_dirs(const std::string &complete)
   {
     std::vector<std::string> ret;
@@ -366,8 +369,7 @@ namespace dish::utils
       if (begin_with(dir_entry.path().lexically_relative(curr).string(),
                      pattern_to_match))
       {
-        ret.emplace_back(dir_entry.path()
-                                 .lexically_relative(curr)
+        ret.emplace_back(dir_entry.path().lexically_relative(curr).lexically_normal()
                                  .string());
         if (dir_entry.is_directory())
           ret.back() += "/";
@@ -381,13 +383,35 @@ namespace dish::utils
     size_t size = 0;
     for (auto it = str.cbegin(); it < str.cend(); ++it)
     {
-      if(*it == '\033')
+      if (*it == '\033')
       {
-        while(it < str.cend() && *it != 'm') ++it;
-        continue ;
+        while (it < str.cend() && *it != 'm') ++it;
+        continue;
       }
       ++size;
     }
     return size;
+  }
+
+  std::string shrink_path(const std::string &path)
+  {
+    if(path == "/") return "/";
+    std::string ret;
+    if (path[0] != '/')
+      ret += path[0];
+    ret += "/";
+
+    for (auto it = path.cbegin(); it < path.cend(); ++it)
+    {
+      if (it - 1 >= path.cbegin() && *(it - 1) == '/')
+      {
+        ret += *it;
+        ret += "/";
+      }
+    }
+    ret.pop_back();
+    if (auto i = path.rfind('/'); i != std::string::npos && i != path.size() - 1)
+      ret.insert(ret.size(), path.substr(i + 2));
+    return ret;
   }
 }
