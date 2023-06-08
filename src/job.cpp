@@ -76,12 +76,15 @@ namespace dish::job
     else if(type == ProcessType::lua_func)
     {
       tiny_utf8::string s;
-      for(size_t i = 1; i + 1 < args.size(); ++i)
+      for(size_t i = 1; i < args.size(); ++i)
       {
+        s += '"';
         s += args[i];
-        s += "\", \"";
+        s += '"';
+        if(i + 1 < args.size())
+          s += ", ";
       }
-      tiny_utf8::string script = fmt::format("print(dish.func.{}(\"{}\"))", args[0], s);
+      tiny_utf8::string script = fmt::format("print(dish.func.{}({}))", args[0], s);
       dish_context.lua_state.script(script.cpp_str(), &lua::dish_sol_error_handler);
       completed = true;
       do_job_notification();

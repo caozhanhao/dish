@@ -111,17 +111,7 @@ namespace dish::utils
 
   bool is_executable(const std::filesystem::path& path);
 
-  template<typename STR>
-  bool begin_with(const STR &a, const STR &b)
-  {
-    if (a.size() < b.size()) return false;
-    for (size_t i = 0; i < b.size(); ++i)
-    {
-      if (a[i] != b[i])
-        return false;
-    }
-    return true;
-  }
+  bool begin_with(const tiny_utf8::string &a, const tiny_utf8::string &b);
 
   std::set<Command> match_command(const tiny_utf8::string& pattern);
 
@@ -133,9 +123,16 @@ namespace dish::utils
 
   std::vector<tiny_utf8::string> match_files_and_dirs(const tiny_utf8::string& path);
 
-  size_t display_size(const tiny_utf8::string& str);
 
-  size_t display_length(const tiny_utf8::string &str);
+  size_t display_width(const tiny_utf8::string::const_iterator& beg, const tiny_utf8::string::const_iterator& end);
+
+  size_t display_width(const tiny_utf8::string &str);
+
+  template<typename ...Args>
+  size_t display_width(const tiny_utf8::string &str, Args&& ...args)
+  {
+    return display_width(str) + display_width(std::forward<Args>(args)...);
+  }
 
   tiny_utf8::string shrink_path(const tiny_utf8::string &path);
 }

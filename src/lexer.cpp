@@ -202,7 +202,7 @@ namespace dish::lexer
     std::vector<Token> ret;
     cmd_state = CmdState::init;
     pos = 0;
-    while (pos < text.size())
+    while (pos < text.length())
     {
       auto t = get_token();
       if (t.has_value())
@@ -218,7 +218,7 @@ namespace dish::lexer
     std::vector<Token> ret;
     cmd_state = CmdState::init;
     pos = 0;
-    while (pos < text.size())
+    while (pos < text.length())
     {
       auto t = get_token();
       if (t.has_value())
@@ -238,49 +238,49 @@ namespace dish::lexer
     }
     return ret;
   }
-  
+
   std::optional<Token> Lexer::get_token()
   {
-    while (pos < text.size() && text[pos] == ' ') ++pos;
-    if (pos < text.size() && text[pos] == '\n')
+    while (pos < text.length() && text[pos] == ' ') ++pos;
+    if (pos < text.length() && text[pos] == '\n')
       return Token{TokenType::newline, "\\n", pos++, 0};
-    else if (pos < text.size() && text[pos] == '|')
+    else if (pos < text.length() && text[pos] == '|')
       return Token{TokenType::pipe, "|", pos++, 1};
-    else if (pos < text.size() && text[pos] == '&')
+    else if (pos < text.length() && text[pos] == '&')
       return Token{TokenType::background, "&", pos++, 1};
-    else if (pos < text.size() && text[pos] == '<')
+    else if (pos < text.length() && text[pos] == '<')
     {
-      if (pos < text.size() - 1 && text[pos + 1] == '<')
+      if (pos < text.length() - 1 && text[pos + 1] == '<')
       {
-        if (pos < text.size() - 2 && text[pos + 2] == '<')
+        if (pos < text.length() - 2 && text[pos + 2] == '<')
           return Token{TokenType::lt_lt_lt, "<<<", pos += 3, 3};
         else
           return Token{TokenType::lt_lt, "<<", pos += 2, 2};
       }
-      else if (pos < text.size() - 1 && text[pos + 1] == '&')
+      else if (pos < text.length() - 1 && text[pos + 1] == '&')
         return Token{TokenType::lt_and, "<&", pos += 2, 2};
-      else if (pos < text.size() - 1 && text[pos + 1] == '>')
+      else if (pos < text.length() - 1 && text[pos + 1] == '>')
         return Token{TokenType::lt_rt, "<>", pos += 2, 2};
       else
         return Token{TokenType::lt, "<", pos++, 1};
     }
-    else if (pos < text.size() && text[pos] == '>')
+    else if (pos < text.length() && text[pos] == '>')
     {
-      if (pos < text.size() - 1 && text[pos + 1] == '>')
+      if (pos < text.length() - 1 && text[pos + 1] == '>')
         return Token{TokenType::rt_rt, ">>", pos += 2, 2};
-      else if (pos < text.size() - 1 && text[pos + 1] == '&')
+      else if (pos < text.length() - 1 && text[pos + 1] == '&')
         return Token{TokenType::rt_and, ">&", pos += 2, 2};
       else
         return Token{TokenType::rt, ">", pos++, 1};
     }
-    else if (pos < text.size() && text[pos] == '$')
+    else if (pos < text.length() && text[pos] == '$')
     {
       ++pos;
       tiny_utf8::string tmp;
       if (text[pos] == '{')
       {
         ++pos;
-        if (pos == text.size())
+        if (pos == text.length())
         {
           fmt::println(stderr, "Synax Error: Unexpected end of token.");
           return std::nullopt;
@@ -289,8 +289,8 @@ namespace dish::lexer
         {
           tmp += text[pos];
           ++pos;
-        } while (pos < text.size() && text[pos] != '}');
-        if (pos == text.size() || text[pos] != '}')
+        } while (pos < text.length() && text[pos] != '}');
+        if (pos == text.length() || text[pos] != '}')
         {
           fmt::println(stderr, "Synax Error: Unexpected end of token.");
           return std::nullopt;
@@ -303,11 +303,11 @@ namespace dish::lexer
         {
           tmp += text[pos];
           ++pos;
-        } while (pos < text.size() && !std::isspace(text[pos]));
+        } while (pos < text.length() && !std::isspace(text[pos]));
       }
-      return Token{TokenType::env_var, tmp, pos, tmp.size()};
+      return Token{TokenType::env_var, tmp, pos, tmp.length()};
     }
-    else if (pos >= text.size())
+    else if (pos >= text.length())
       return Token{TokenType::end, "end", 0, 0};
     else
     {
@@ -319,12 +319,12 @@ namespace dish::lexer
         else
           tmp += text[pos];
         ++pos;
-      } while (pos < text.size() && (parsing_str || !std::isspace(text[pos])));
-      return Token{TokenType::word, tmp, pos, tmp.size()};
+      } while (pos < text.length() && (parsing_str || text[pos] != ' '));
+      return Token{TokenType::word, tmp, pos, tmp.length()};
     }
     return Token{TokenType::end, "end", 0, 0};
   }
-  
+
   tiny_utf8::string Lexer::mark_error_from_token(const Token &token) const
   {
     std::size_t size = token.get_size();

@@ -35,7 +35,7 @@ namespace dish::line_editor
     // edit
     tiny_utf8::string line;
     size_t pos;
-    size_t last_refresh_pos;
+    size_t last_cols;
 
     // history
     std::vector<History> history;
@@ -47,8 +47,6 @@ namespace dish::line_editor
 
     // complete
     tiny_utf8::string prompt;
-    size_t screen_width;
-    size_t screen_height;
     size_t completion_show_line_pos;
     size_t completion_show_line_size;
     tiny_utf8::string complete_pattern; // for highlight

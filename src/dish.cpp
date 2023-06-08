@@ -83,13 +83,6 @@ namespace dish
       }
       tcsetpgrp(dish_context.terminal, dish_context.pgid);
       tcgetattr(dish_context.terminal, &dish_context.tmodes);
-      // Put the terminal to raw mode for line editing.
-      dish_context.tmodes.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-      dish_context.tmodes.c_cflag |= (CS8);
-      dish_context.tmodes.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-      dish_context.tmodes.c_cc[VMIN] = 1;
-      dish_context.tmodes.c_cc[VTIME] = 0;
-      tcsetattr(dish_context.terminal, TCSAFLUSH, &dish_context.tmodes);
     }
 
     //
@@ -143,7 +136,7 @@ namespace dish
       line_editor::dle_context.history.emplace_back
               (line_editor::History{cmd, timestamp});
     };
-    // promptsc
+    // prompt
     dish_context.lua_state["dish"]["prompt"] = sol::nil;
     // prompt utils
     dish_context.lua_state["dish_get_tilde_path"] =

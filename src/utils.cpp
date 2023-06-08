@@ -16,6 +16,8 @@
 #include "dish/dish.hpp"
 #include "dish/builtin.hpp"
 
+#include "dish/bundled/widecharwidth/widechar_width.h"
+
 #include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
@@ -236,25 +238,20 @@ namespace dish::utils
             ((p & std::filesystem::perms::others_exec) != std::filesystem::perms::none));
   }
 
+  bool begin_with(const tiny_utf8::string &a, const tiny_utf8::string &b)
+  {
+    if (a.length() < b.length()) return false;
+    for (size_t i = 0; i < b.length(); ++i)
+    {
+      if (a[i] != b[i])
+        return false;
+    }
+    return true;
+  }
+
   std::set<Command> match_command(const tiny_utf8::string &pattern)
   {
     std::set<Command> ret;
-    // PATH
-    for (auto &path: get_path())
-    {
-      for (auto &dir_entry: std::filesystem::directory_iterator{path.cpp_str()})
-      {
-        if (dir_entry.is_directory() || !is_executable(dir_entry.path())) continue;
-        if (begin_with(tiny_utf8::string(dir_entry.path().filename().string()), pattern))
-        {
-          auto size = std::filesystem::file_size(dir_entry.path());
-          CommandType type = CommandType::executable_file;
-          if (std::filesystem::is_symlink(dir_entry.path()))
-            type = CommandType::executable_link;
-          ret.insert(Command{dir_entry.path().filename().string(), type, size});
-        }
-      }
-    }
     // builtin
     for (auto &r: builtin::builtins)
     {
@@ -268,6 +265,29 @@ namespace dish::utils
       if (begin_with(fn, pattern))
         ret.insert(Command{fn, CommandType::lua_func, 0});
     }
+    // PATH
+    try
+    {
+      for (auto &path: get_path())
+      {
+        for (auto &dir_entry: std::filesystem::directory_iterator{path.cpp_str()})
+        {
+          if (dir_entry.is_directory() || !is_executable(dir_entry.path())) continue;
+          if (begin_with(tiny_utf8::string(dir_entry.path().filename().string()), pattern))
+          {
+            auto size = std::filesystem::file_size(dir_entry.path());
+            CommandType type = CommandType::executable_file;
+            if (std::filesystem::is_symlink(dir_entry.path()))
+              type = CommandType::executable_link;
+            ret.insert(Command{dir_entry.path().filename().string(), type, size});
+          }
+        }
+      }
+    }
+    catch (...)
+    {
+      return ret;
+    }
     return ret;
   }
 
@@ -279,24 +299,32 @@ namespace dish::utils
     if (dish_context.lua_state["dish"]["func"][cmd.cpp_str()].valid())
       return {CommandType::lua_func, cmd};
 
-    bool found = false;
-    tiny_utf8::string abs_path;
-    for (auto path: get_path())
+    try // such as permission denied
     {
-      abs_path = path + "/" + cmd;
-      if (std::filesystem::exists(abs_path.cpp_str()))
+      bool found = false;
+      tiny_utf8::string abs_path;
+      for (auto path: get_path())
       {
-        found = true;
-        break;
+        abs_path = path + "/" + cmd;
+        if (std::filesystem::exists(abs_path.cpp_str()))
+        {
+          found = true;
+          break;
+        }
       }
+      if (!found)
+        return {CommandType::not_found, ""};
+      if (!is_executable(abs_path.cpp_str()))
+        return {CommandType::not_executable, abs_path};
+      if (std::filesystem::is_symlink(std::filesystem::path(abs_path.cpp_str())))
+        return {CommandType::executable_link, abs_path};
+      return {CommandType::executable_file, abs_path};
     }
-    if (!found)
-      return {CommandType::not_found, ""};
-    if (!is_executable(abs_path.cpp_str()))
-      return {CommandType::not_executable, abs_path};
-    if (std::filesystem::is_symlink(std::filesystem::path(abs_path.cpp_str())))
-      return {CommandType::executable_link, abs_path};
-    return {CommandType::executable_file, abs_path};
+    catch (...)
+    {
+      return {};
+    }
+    return {};
   }
 
   tiny_utf8::string get_human_readable_size(size_t sz)
@@ -339,84 +367,87 @@ namespace dish::utils
 
   std::vector<tiny_utf8::string> match_files_and_dirs(const tiny_utf8::string &complete_)
   {
-    tiny_utf8::string complete = tilde_expand(complete_);
     std::vector<tiny_utf8::string> ret;
-    std::filesystem::directory_iterator dit;
-    std::filesystem::path base;
-    tiny_utf8::string pattern_to_match;
-    auto curr = std::filesystem::current_path();
-    if (complete.empty() || complete.find('/') == tiny_utf8::string::npos)
+    try // such as permission denied
     {
-      dit = std::filesystem::directory_iterator{curr};
-      pattern_to_match = complete;
-      base = std::filesystem::current_path();
-    }
-    else
-    {
-      std::filesystem::path path(complete.cpp_str());
-      if (std::filesystem::is_directory(path))
+      tiny_utf8::string complete = tilde_expand(complete_);
+      std::filesystem::directory_iterator dit;
+      tiny_utf8::string pattern_to_match;
+      auto curr = std::filesystem::current_path();
+      if (complete.empty() || complete.find('/') == tiny_utf8::string::npos)
       {
-        if (!std::filesystem::exists(path))
-          return {};
-        pattern_to_match = "";
-        base = std::filesystem::current_path();
-        dit = std::filesystem::directory_iterator{curr / path};
+        // filename
+        dit = std::filesystem::directory_iterator{curr};
+        pattern_to_match = complete;
       }
       else
       {
-        if (!std::filesystem::exists(path.parent_path()))
-          return {};
-        pattern_to_match = tilde_expand(complete);
-        base = path.parent_path();
-        dit = std::filesystem::directory_iterator{path.parent_path()};
+        std::filesystem::path path(complete.cpp_str());
+        if (std::filesystem::is_directory(path))
+        {
+          // path
+          if (!std::filesystem::exists(path))
+            return {};
+          if (complete_.back() != '/')// path without '/'
+            return {complete_ + "/"};
+          pattern_to_match = "";
+          dit = std::filesystem::directory_iterator{curr / path};
+        }
+        else
+        {
+          // maybe broken filename
+          if (!std::filesystem::exists(path.parent_path()))
+            return {};
+          pattern_to_match = tilde_expand(path.filename().string());
+          dit = std::filesystem::directory_iterator{path.parent_path()};
+        }
+      }
+
+      for (auto &dir_entry: dit)
+      {
+        auto abs = std::filesystem::absolute(dir_entry.path());
+        tiny_utf8::string name;
+        if (dir_entry.is_directory())
+          name = std::filesystem::path(dir_entry.path().string()).filename().string() + "/";
+        else
+          name = dir_entry.path().filename().string();
+
+        if (begin_with(name, pattern_to_match))
+          ret.emplace_back(name);
       }
     }
-
-    for (auto &dir_entry: dit)
+    catch(...)
     {
-      auto abs = std::filesystem::absolute(dir_entry.path());
-      tiny_utf8::string name;
-      if (dir_entry.is_directory())
-        name = std::filesystem::path(dir_entry.path().string()).filename().string() + "/";
-      else
-        name = dir_entry.path().filename().string();
-
-      if (begin_with(name, pattern_to_match))
-      {
-        ret.emplace_back(name);
-      }
+      return ret;
     }
     return ret;
   }
 
-  size_t display_length(const tiny_utf8::string &str)
+  size_t display_width(const tiny_utf8::string::const_iterator& beg, const tiny_utf8::string::const_iterator& end)
   {
-    tiny_utf8::string ret;
-    for (auto it = str.cbegin(); it < str.cend(); ++it)
+    // TODO Optimization
+    tiny_utf8::string no_ansi;
+    for (auto it = beg; it < end; ++it)
     {
       if (*it == '\033')
       {
-        while (it < str.cend() && *it != 'm') ++it;
+        while (it < end && *it != 'm') ++it;
         continue;
       }
-      ret += *it;
+      no_ansi += *it;
     }
-    return ret.length();
+    std::u32string wide(no_ansi.length(), 0);
+    no_ansi.to_wide_literal(&wide[0]);
+    size_t width = 0;
+    for(auto& r : wide)
+      width += widechar_wcwidth(r);
+    return width;
   }
 
-  size_t display_size(const tiny_utf8::string &str)
+
+  size_t display_width(const tiny_utf8::string &str)
   {
-    size_t size = 0;
-    for (auto it = str.cbegin(); it < str.cend(); ++it)
-    {
-      if (*it == '\033')
-      {
-        while (it < str.cend() && *it != 'm') ++it;
-        continue;
-      }
-      ++size;
-    }
-    return size;
+    return display_width(str.cbegin(), str.cend());
   }
 
   tiny_utf8::string shrink_path(const tiny_utf8::string &path)

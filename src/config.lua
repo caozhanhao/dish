@@ -15,6 +15,7 @@ dish.style = {
     hint = dish.effects.faint,
     info = dish.effects.fg_magenta
 }
+
 function ys_prompt()
     p = string.format("\n[1;34m#[0m [36m%s[0m in [1;33m%s[0m [%s]\n",
             dish.environment.USERNAME, dish.environment.PWD, os.date("%H:%M:%S",os.time()))
@@ -35,7 +36,7 @@ end
 dish.prompt = my_prompt
 
 
-git_table = { { "add", "Add file contents to the index" },
+git_table = { { "add", "Add file contents to the index" , "add"},
                     { "merge", "Join two or more development histories together" },
                     { "apply", "Apply a patch on a git index file and a working tree" },
                     { "mergetool", "Run merge conflict resolution tools to resolve merge conflicts" },

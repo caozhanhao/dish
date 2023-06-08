@@ -68,7 +68,7 @@ namespace dish::line_editor
   {
     std::cout.write(str.c_str(), str.size());
     std::cout.flush();
-    //std::this_thread::sleep_for(std::chrono::milliseconds (500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
   template<typename ...Args>
@@ -77,32 +77,44 @@ namespace dish::line_editor
     dle_write(fmt::format(fmt.cpp_str(), std::forward<Args>(args)...));
   }
 
+  size_t dle_pos_width()
+  {
+    return utils::display_width(dle_context.line.begin(),
+                                dle_context.line.begin() + dle_context.pos);
+  }
+
   void dle_init()
   {
-    dle_context.pos = 1;
     dle_context.history_pos = 0;
-    dle_context.last_refresh_pos = 0;
+    dle_context.last_cols = 0;
     dle_context.completion_pos_line = 0;
     dle_context.completion_pos_column = 0;
     dle_context.completion_show_line_pos = 0;
     dle_context.completion_show_line_size = 0;
+
+    // Put the terminal to raw mode for line editing.
+    dish_context.tmodes.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    dish_context.tmodes.c_cflag |= (CS8);
+    dish_context.tmodes.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    dish_context.tmodes.c_cc[VMIN] = 1;
+    dish_context.tmodes.c_cc[VTIME] = 0;
+    tcsetattr(dish_context.terminal, TCSAFLUSH, &dish_context.tmodes);
+
+    dle_context.searching_completion = false;
+  }
+
+  int dle_screen_height()
+  {
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    dle_context.screen_width = w.ws_col;
-    dle_context.screen_height = w.ws_row;
-    if (dle_context.screen_width == 0)
-    {
-      fmt::println(stderr, "Dish Line Editor Error: "
-                           "Can not get the screen's width, assuming 128.");
-      dle_context.screen_width = 128;
-    }
-    if (dle_context.screen_height == 0)
-    {
-      fmt::println(stderr, "Dish Line Editor Error: "
-                           "Can not get the screen's width, assuming 10.");
-      dle_context.screen_height = 10;
-    }
-    dle_context.searching_completion = false;
+    return (w.ws_row != 0 ? w.ws_row : 8);
+  }
+
+  int dle_screen_width()
+  {
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    return (w.ws_col != 0 ? w.ws_col : 128);
   }
 
   tiny_utf8::string get_color(int c)
@@ -206,25 +218,48 @@ namespace dish::line_editor
     return 0;
   }
 
-  tiny_utf8::string get_hint()
+  std::tuple<tiny_utf8::string, tiny_utf8::string> split_path(const tiny_utf8::string& pattern)
+  {
+    if(pattern.empty()) return {"", ""};
+    if(pattern == "/") return {"/", ""};
+    tiny_utf8::string path, filename;
+    auto i = pattern.rfind('/');
+    if(i == tiny_utf8::string::npos)
+      filename = pattern;
+    else
+    {
+      path = pattern.substr(0, i + 1);
+      filename = pattern.substr(i + 1);
+    }
+    return {path, filename};
+  }
+
+  std::tuple<tiny_utf8::string, tiny_utf8::string> get_pattern()
   {
     tiny_utf8::string before_pattern;
     tiny_utf8::string pattern;
     if (dle_context.line.back() != ' ')
     {
       auto i = dle_context.line.rfind(' ', dle_context.pos);
-      if (i != tiny_utf8::string::npos && i + 1 < dle_context.line.size())
+      if (i != tiny_utf8::string::npos && i + 1 < dle_context.line.length())
       {
         pattern = dle_context.line.substr(i + 1);
         before_pattern = dle_context.line.substr(0, i);
       }
+      else
+        pattern = dle_context.line;
     }
     else
     {
       before_pattern = dle_context.line;
       if(!before_pattern.empty()) before_pattern.pop_back();
     }
+    return {before_pattern, pattern};
+  }
 
+  tiny_utf8::string get_hint()
+  {
+    auto [before_pattern, pattern] = get_pattern();
     // lua hint
     if (sol::protected_function h = dish_context.lua_state["dish"]["hint"]; h.valid())
     {
@@ -247,13 +282,15 @@ namespace dish::line_editor
       if (!cmds.empty())
         return cmds.begin()->name.substr(dle_context.line.length());
     }
-    // file hint
+    // filesystem hint
     if(auto files = utils::match_files_and_dirs(pattern); !files.empty())
     {
-      if (utils::begin_with(files[0], pattern))
-        return files[0].substr(pattern.size());
-      else
-        return files[0];
+      auto [path, filename] = split_path(pattern);
+      if (!filename.empty() && utils::begin_with(files[0], filename))
+        return files[0].substr(filename.length());
+      else if (filename.empty() && utils::begin_with(files[0], path))
+        return files[0].substr(path.length());
+      return files[0];
     }
     return "";
   }
@@ -261,29 +298,27 @@ namespace dish::line_editor
   void cmdline_refresh(bool with_hints)
   {
     // move to begin and clear the line
-    if (dle_context.last_refresh_pos != 0)
-      dle_write("\x1b[{}D\x1b[K", dle_context.last_refresh_pos);
+    if (dle_context.last_cols != 0)
+      dle_write("\x1b[{}D\x1b[K", dle_context.last_cols);
     else
       dle_write("\x1b[K");
     // the current line
     dle_write(highlight_line());
     // hint
+    dle_context.hint.clear();
     if (with_hints)
     {
       dle_context.hint = get_hint();
       dle_write(utils::effect(dle_context.hint,
-                           static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["hint"].get<int>())));
+                              static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["hint"].get<int>())));
     }
-    else
-      dle_context.hint.clear();
     // move cursor back
-    if (dle_context.pos < dle_context.line.size() + dle_context.hint.size())
-    {
-      dle_write("\x1b[{}D",
-                         dle_context.hint.size() + dle_context.line.size() - dle_context.pos);
-    }
+    auto cursor_col = dle_pos_width();
+    auto curr_col = utils::display_width(dle_context.hint, dle_context.line);
+    if(curr_col != cursor_col)
+      dle_write("\x1b[{}D", curr_col - cursor_col);
     // save pos for next refresh
-    dle_context.last_refresh_pos = dle_context.pos;
+    dle_context.last_cols = cursor_col;
   }
   void edit_refresh_line(bool with_hints)
   {
@@ -293,23 +328,17 @@ namespace dish::line_editor
       complete_refresh();
   }
 
-  // output, info, raw
+  // raw, info, output
   std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>>
   get_argument_candidate()
   {
-    utils::Effect info_color = static_cast<utils::Effect>
-            (dish_context.lua_state["dish"]["style"]["info"].get<int>());
+    utils::Effect info_color = static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["info"].get<int>());
     std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>> ret;
     // lua complete
     if (sol::protected_function h = dish_context.lua_state["dish"]["complete"]; h.valid())
     {
-
-      tiny_utf8::string before_pattern;
-      auto it = dle_context.line.raw_crbegin();
-      for(; it < dle_context.line.raw_crend() && *it != ' '; ++it);
-      if(it > dle_context.line.raw_crbegin())
-        before_pattern = dle_context.line.substr(0, it - dle_context.line.raw_crbegin());
-
+      auto [before_pattern, pattern] = get_pattern();
+      dle_context.complete_pattern = pattern;
       auto res = h(before_pattern.cpp_str(), dle_context.complete_pattern.cpp_str());
       if (res.valid() && res.get_type() == sol::type::table)
       {
@@ -317,22 +346,22 @@ namespace dish::line_editor
         {
           if (r.second.get_type() != sol::type::table)
             break;
-          if(auto lhs = r.second.as<sol::table>()[1], rhs = r.second.as<sol::table>()[2];
-              lhs.valid() && rhs.valid()
-              && lhs.get_type() == sol::type::string && rhs.get_type() == sol::type::string)
+          if (auto lhs = r.second.as<sol::table>()[1], rhs = r.second.as<sol::table>()[2];
+              lhs.valid() && rhs.valid() && lhs.get_type() == sol::type::string && rhs.get_type() == sol::type::string)
           {
-            tiny_utf8::string raw = lhs.get<std::string>();
-            if(auto raw_lua = r.second.as<sol::table>()[3];
+            tiny_utf8::string output = lhs.get<std::string>();
+            if (auto raw_lua = r.second.as<sol::table>()[3];
                 raw_lua.valid() && raw_lua.get_type() == sol::type::string)
             {
-              raw = raw_lua.get<std::string>();
+              output = raw_lua.get<std::string>();
             }
             ret.emplace_back(
-                    lhs.get<std::string>(),// output
-                    fmt::format("({})", utils::effect(rhs.get<std::string>(),
-                            info_color)),// info
-                    raw // raw
-                    );
+                    lhs.get<std::string>(),                               // output
+                    fmt::format("({})",
+                                utils::effect(rhs.get<std::string>(),
+                                                      info_color)),// info
+                    output                                                  // raw
+            );
           }
           else
           {
@@ -346,27 +375,26 @@ namespace dish::line_editor
       auto f = utils::match_files_and_dirs(dle_context.complete_pattern);
       for (auto &r: f)
       {
+        auto [path, filename] = split_path(dle_context.complete_pattern);
         tiny_utf8::string raw;
-        if(dle_context.complete_pattern.back() == '/')
-          raw = dle_context.complete_pattern + r;
-        else
-          raw = r;
-        ret.emplace_back(r,   // output
-                         "",  //info
-                         raw);// raw
+        raw = path + r;
+        ret.emplace_back(raw,   // raw
+                         "",    //info
+                         r);    // output
       }
       dle_context.complete_pattern = "";
     }
     return ret;
   }
 
-  // output, info, raw
+  // raw, output, info
   std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>>
   get_cmd_candidate()
   {
     utils::Effect info_color = static_cast<utils::Effect>
             (dish_context.lua_state["dish"]["style"]["info"].get<int>());
     std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>>  ret;
+    dle_context.complete_pattern = dle_context.line.substr(0, dle_context.pos);
     auto cmds = utils::match_command(dle_context.complete_pattern);
     for (auto &r: cmds)
     {
@@ -393,14 +421,14 @@ namespace dish::line_editor
     dle_context.completion_show_line_pos = 0;
     dle_context.completion_pos_line = 0;
     dle_context.completion_pos_column = 0;
-    size_t columns = dle_context.screen_width / (max_size + 2);
+    size_t columns = dle_screen_width() / (max_size + 2);
     size_t lines = std::ceil(static_cast<double>(total) / static_cast<double>(columns));
     columns -= (lines * columns - total) / lines;
 
     dle_context.completion.insert(dle_context.completion.end(), columns, {});
     for (auto &r: dle_context.completion) r.insert(r.end(), lines, {"", ""});
-    if(lines > dle_context.screen_height - 3)
-      dle_context.completion_show_line_size = dle_context.screen_height - 3;
+    if(lines > dle_screen_height() - 3)
+      dle_context.completion_show_line_size = dle_screen_height() - 3;
     else
       dle_context.completion_show_line_size = lines;
     return {columns, lines};
@@ -418,19 +446,10 @@ namespace dish::line_editor
                             dle_context.line.begin() + dle_context.pos, ' ');
         it == dle_context.line.end())
     {
-      dle_context.complete_pattern = dle_context.line.substr(0, dle_context.pos);
       items = get_cmd_candidate();
     }
     else
     {
-      tiny_utf8::string last_word;
-      if (dle_context.line.back() != ' ')
-      {
-        auto i = dle_context.line.rfind(' ', dle_context.pos);
-        if (i != tiny_utf8::string::npos && i + 1 < dle_context.line.size())
-          last_word = dle_context.line.substr(i + 1);
-      }
-      dle_context.complete_pattern = last_word;
       items = get_argument_candidate();
     }
     if (items.empty()) return 0;
@@ -438,23 +457,28 @@ namespace dish::line_editor
     {
       dle_context.completion = {{{"", std::get<0>(items[0])}}};
       complete_select();
-      complete_clear();
       return 0;
     }
     auto max_size_item = std::max_element(items.cbegin(), items.cend(),
                                           [](auto &&a, auto &&b) {
-                                            return (utils::display_length(std::get<0>(a)) + utils::display_length(std::get<1>(a))<
-                                                    utils::display_length(std::get<0>(b)) + utils::display_length(std::get<1>(b)));
+                                            return (utils::display_width(std::get<0>(a)) + utils::display_width(std::get<1>(a))<
+                                                    utils::display_width(std::get<0>(b)) + utils::display_width(std::get<1>(b)));
                                           });
-    size_t max_size = utils::display_length(std::get<0>(*max_size_item)) + utils::display_length(std::get<1>(*max_size_item));
-    auto [columns, lines] = complete_init(items.size(), max_size);
+    size_t max_width = utils::display_width(std::get<0>(*max_size_item), std::get<1>(*max_size_item));
+    if(dle_screen_width() < max_width + 2)
+    {
+      complete_clear();
+      return -1;
+    }
+    auto [columns, lines] = complete_init(items.size(), max_width);
     size_t line = 0;
     size_t column = 0;
     for (auto &r: items)
     {
-      auto [out, info, raw] = r;
+      auto [raw, info, out] = r;
       tiny_utf8::string output = out;
-      output.insert(output.end(), tiny_utf8::string(max_size - out.length() - utils::display_size(info), ' '));
+      output.insert(output.end(),
+                    tiny_utf8::string(max_width - utils::display_width(out,info), ' '));
       output += info;
       dle_context.completion[column][line] = {output, raw};
       if (line < lines - 1)
@@ -547,7 +571,8 @@ namespace dish::line_editor
       complete_up();
   }
 
-  int get_columns_before_complete()
+
+  int get_prompt_columns()
   {
     size_t ret = 0;
     auto i = dle_context.prompt.rfind('\n');
@@ -561,33 +586,37 @@ namespace dish::line_editor
         last_line = i;
       else if (i != tiny_utf8::string::npos && j != tiny_utf8::string::npos)
         last_line = std::min(i, j);
-      ret += utils::display_size(dle_context.prompt.substr(last_line + 1));
+      ret += utils::display_width(dle_context.prompt.substr(last_line + 1));
     }
-    ret += dle_context.last_refresh_pos;
     return ret;
+  }
+
+  int get_pos_columns()
+  {
+    return get_prompt_columns() + dle_context.last_cols;
   }
 
   void complete_apply()
   {
-    const auto &cmd = std::get<1>(dle_context.completion[dle_context.completion_pos_column]
-                                                        [dle_context.completion_pos_line]);
-    auto b = dle_context.pos - 1;
-    auto e = dle_context.pos - 1;
-    while (b > 0 && dle_context.line[b] != ' ')
-      --b;
-    while (e < dle_context.line.size()  && dle_context.line[e] != ' ')
-      ++e;
-    dle_context.line.erase(b, e - b);
-    if (b != 0)
-      dle_context.line.insert(b++, ' ');
-    dle_context.line.insert(b, cmd);
-    dle_context.pos = b + cmd.size();
-    dle_context.last_refresh_pos = b + cmd.length();
+    const auto &completion = std::get<1>(dle_context.completion[dle_context.completion_pos_column]
+                                                               [dle_context.completion_pos_line]);
+    if (dle_context.pos != 0 && dle_context.line[dle_context.pos - 1] != ' ')
+    {
+      int b = dle_context.pos;
+      while (b > 0 && dle_context.line[b] != ' ')
+        --b;
+      if (dle_context.line[b] == ' ') ++b;
+      dle_context.line.erase(b, dle_context.pos - b);
+      dle_context.pos = b;
+    }
+    dle_context.line.insert(dle_context.pos, completion);
+    dle_context.pos += completion.length();
+    dle_context.last_cols = dle_pos_width();
   }
 
   void complete_refresh()
   {
-    size_t last_size = 0;
+    size_t completion_col = utils::display_width(std::get<0>(dle_context.completion[0][0]));
     size_t lines = dle_context.completion[0].size();
     size_t screen_lines = std::min(dle_context.completion_show_line_size, dle_context.completion[0].size());
     size_t columns = dle_context.completion.size();
@@ -624,33 +653,40 @@ namespace dish::line_editor
             if (line != dle_context.complete_pattern)
               out += line.substr(dle_context.complete_pattern.length());
           }
-          last_size = utils::display_size(out);
-          dle_write("{}\x1b[{}D\x1b[1B", out, last_size);
+          dle_write("{}", out);
+          dle_write("\x1b[{}D\x1b[1B", completion_col);
         }
         else // Padding
           dle_write("\x1b[1D\x1b[1B");
       }
       if (c < columns - 1)
-        dle_write("\x1b[{}A\x1b[{}C", screen_lines, last_size + 2);
+        dle_write("\x1b[{}A\x1b[{}C", screen_lines, completion_col + 2);
     }
 
     if (dle_context.searching_completion)
       complete_apply();
     // move cursor back
     dle_write("\x1b[{}F", screen_lines + 1);
-    if (auto i = get_columns_before_complete(); i != 0)
+    if (auto i = get_pos_columns(); i != 0)
       dle_write("\x1b[{}C", i);
     cmdline_refresh(dish_context.lua_state["dish"]["enable_hint"]);
   }
 
   void complete_clear()
   {
-    size_t screen_lines = 1 + std::min(dle_context.completion_show_line_size, dle_context.completion[0].size());
-    for(size_t i = 0; i < screen_lines; ++i)
-      dle_write("\x1b[B\x1b[2K");
-    dle_write("\x1b[{}F", screen_lines);
-    if (auto i = get_columns_before_complete(); i != 0)
-      dle_write("\x1b[{}C", i);
+    // When there is only an item, we have noting to clear.
+    if (!dle_context.completion.empty() && dle_context.completion.size() != 1 && dle_context.completion[0].size() != 1)
+    {
+      size_t screen_lines = 1 + std::min(dle_context.completion_show_line_size, dle_context.completion[0].size());
+      for (size_t i = 0; i < screen_lines; ++i)
+        dle_write("\x1b[B\x1b[2K");
+      dle_write("\x1b[{}F", screen_lines);
+    }
+    if (auto i = get_pos_columns(); i != 0)
+    {
+      dle_write("\x1b[{}D\x1b[{}C",
+                get_prompt_columns() + utils::display_width(dle_context.line), i);
+    }
     dle_context.completion.clear();
     dle_context.searching_completion = false;
     dle_context.completion_show_line_pos = 0;
@@ -663,7 +699,7 @@ namespace dish::line_editor
   {
     complete_apply();
     complete_clear();
-    if(dle_context.line[dle_context.pos - 1] != '/')
+    if (dle_context.line[dle_context.pos - 1] != '/')
     {
       dle_context.line.insert(dle_context.line.begin() + dle_context.pos, ' ');
       ++dle_context.pos;
@@ -673,10 +709,9 @@ namespace dish::line_editor
   void move_to_beginning()
   {
     if (dle_context.pos == 0) return;
-    auto origin = dle_context.pos;
+    dle_write("\x1b[{}D", dle_pos_width());
     dle_context.pos = 0;
-    dle_write("\x1b[{}D", origin);
-    dle_context.last_refresh_pos = dle_context.pos;
+    dle_context.last_cols = 0;
   }
 
   void move_to_end()
@@ -689,16 +724,16 @@ namespace dish::line_editor
       dle_context.hint.clear();
       refresh = true;
     }
-    auto origin = dle_context.pos;
+    auto origin_width = dle_pos_width();
     dle_context.pos = dle_context.line.length();
-    dle_write("\x1b[{}C", dle_context.pos - origin);
-    dle_context.last_refresh_pos = dle_context.pos;
+    dle_context.last_cols = dle_pos_width();
+    dle_write("\x1b[{}C", dle_context.last_cols - origin_width);
     if (refresh) edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
   }
 
   void move_to_word_beginning()
   {
-    auto origin = dle_context.pos;
+    auto origin = dle_pos_width();
     if (dle_context.line[dle_context.pos - 1] == ' ')
       --dle_context.pos;
     // curr is not space
@@ -707,31 +742,31 @@ namespace dish::line_editor
     // prev is space or begin
     while (dle_context.pos > 0 && dle_context.line[dle_context.pos - 1] != ' ')
       --dle_context.pos;
-    dle_write("\x1b[{}D", origin - dle_context.pos);
-    dle_context.last_refresh_pos = dle_context.pos;
+    dle_context.last_cols = dle_pos_width();
+    dle_write("\x1b[{}D", origin - dle_context.last_cols);
   }
 
   void move_to_word_end()
   {
-    auto origin = dle_context.pos;
+    auto origin = dle_pos_width();
     // curr is not space
     while (dle_context.pos < dle_context.line.length() && dle_context.line[dle_context.pos] == ' ')
       ++dle_context.pos;
     // next is space or end
     while (dle_context.pos < dle_context.line.length() && dle_context.line[dle_context.pos] != ' ')
       ++dle_context.pos;
-    dle_write("\x1b[{}C", dle_context.pos - origin);
-    dle_context.last_refresh_pos = dle_context.pos;
+    dle_context.last_cols = dle_pos_width();
+    dle_write("\x1b[{}C", dle_context.last_cols - origin);
   }
 
   void move_left()
   {
     if (dle_context.pos > 0)
     {
-      auto origin = dle_context.pos;
-      dle_context.pos = ((dle_context.line.begin() + dle_context.pos) - 1) - dle_context.line.begin();
-      dle_context.last_refresh_pos = dle_context.pos;
-      dle_write("\x1b[{}D", origin - dle_context.pos);
+      auto origin = dle_pos_width();
+      --dle_context.pos;
+      dle_context.last_cols = dle_pos_width();
+      dle_write("\x1b[{}D", origin - dle_context.last_cols);
     }
   }
 
@@ -739,10 +774,10 @@ namespace dish::line_editor
   {
     if (dle_context.pos < dle_context.line.length())
     {
-      auto origin = dle_context.pos;
-      dle_context.pos = ((dle_context.line.begin() + dle_context.pos) + 1) - dle_context.line.begin();
-      dle_context.last_refresh_pos = dle_context.pos;
-      dle_write("\x1b[{}C", dle_context.pos - origin);
+      auto origin = dle_pos_width();
+      ++dle_context.pos;
+      dle_context.last_cols = dle_pos_width();
+      dle_write("\x1b[{}C", dle_context.last_cols - origin);
     }
   }
 
@@ -865,41 +900,64 @@ namespace dish::line_editor
     dle_write("\x1b[H\x1b[2J");
   }
 
+  int utf8_len(const std::string& s)
+  {
+    int j, len = 0;
+    for (int i = 0; s[i] != 0; i++)
+    {
+      if (s[i] & 0x80)
+      {
+        j = 1;
+        while ((s[++i] & 0x80) && !(s[i] & 0x40)) j++;
+        len += 2;
+        i--;
+      }
+      else
+        len++;
+    }
+    return len;
+  }
+
+
   // the core of Dish Line Editor
   int edit_line()
   {
     dle_context.line.clear();
-    dle_context.last_refresh_pos = 0;
+    dle_context.last_cols = 0;
     dle_context.pos = 0;
     dle_context.history.emplace_back(History{"", ""});
     dle_context.history_pos = dle_context.history.size() - 1;
+    std::string codepoint_buf;
     while (true)
     {
-      char buf[32];
-      std::cin.read(buf, 1);
-      if (is_special_key(static_cast<int>(buf[0])))
+      char buf;
+      std::cin.read(&buf, 1);
+      if (is_special_key(static_cast<int>(buf)))
       {
-        SpecialKey key = static_cast<SpecialKey>(buf[0]);
+        SpecialKey key = static_cast<SpecialKey>(buf);
         if (key == SpecialKey::TAB)
         {
+          // 1
           if (dle_context.completion.empty())
           {
             complete_line();
-            edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
-            dle_context.searching_completion = true;
           }
           else
           {
-            edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
-            if(dle_context.searching_completion)
+            // 2
+            if (!dle_context.searching_completion)
+              dle_context.searching_completion = true;
+            // 3
+            else
               complete_down();
           }
+          edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
           continue;
         }
         switch (key)
         {
           case SpecialKey::CTRL_A:
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
               complete_select();
             move_to_beginning();
             break;
@@ -907,12 +965,11 @@ namespace dish::line_editor
             edit_left();
             break;
           case SpecialKey::CTRL_C:
-            dle_context.history.pop_back();
             dle_context.line.clear();
-            dle_context.pos = 0;
+            dle_context.history.pop_back();
             dish_context.lua_state["last_foreground_ret"] = 127;
             dle_write("\033[40;37m^C\033[0m");
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
             {
               dle_write("\x1b[{}E", dle_context.completion[0].size());
               dle_context.searching_completion = false;
@@ -924,7 +981,7 @@ namespace dish::line_editor
             edit_delete();
             break;
           case SpecialKey::CTRL_E:
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
               complete_select();
             move_to_end();
             break;
@@ -932,18 +989,18 @@ namespace dish::line_editor
             edit_right();
             break;
           case SpecialKey::CTRL_K:
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
               complete_select();
-            dle_context.line.erase(dle_context.pos);
+            edit_delete();
             break;
           case SpecialKey::CTRL_L:
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
               complete_select();
             clear_screen();
             break;
           case SpecialKey::LINE_FEED:
           case SpecialKey::ENTER:
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
             {
               complete_select();
               edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
@@ -968,7 +1025,7 @@ namespace dish::line_editor
             edit_up();
             break;
           case SpecialKey::CTRL_T:
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
               complete_select();
             if (dle_context.pos != 0)
             {
@@ -978,14 +1035,12 @@ namespace dish::line_editor
             }
             break;
           case SpecialKey::CTRL_U:
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
               complete_select();
-            dle_context.line.clear();
-            dle_context.pos = 0;
             break;
           case SpecialKey::CTRL_W:
           {
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
               complete_select();
             if (dle_context.pos == 0) break;
             auto origin_pos = dle_context.pos;
@@ -1100,30 +1155,40 @@ namespace dish::line_editor
             break;
           case SpecialKey::BACKSPACE:
           case SpecialKey::CTRL_H:
-            if(!dle_context.completion.empty())
+            if (!dle_context.completion.empty())
               complete_clear();
             edit_backspace();
             break;
           default:
-            fmt::println(stderr, "\nWARNING: Ignored unrecognized key '{}'.", buf[0]);
+            fmt::println(stderr, "\nWARNING: Ignored unrecognized key '{}'.", buf);
             dle_context.history.pop_back();
-            dle_context.line.clear();
-            dle_context.pos = 0;
             dish_context.lua_state["last_foreground_ret"] = -1;
             return -1;
             break;
         }
+        edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
       }
       else
       {
-        dle_context.line.insert(dle_context.line.begin() + dle_context.pos, buf[0]);
+        if(isprint(buf) || is_special_key(buf) || iscntrl(buf))
+          dle_context.line.insert(dle_context.pos++, buf);
+        else
+        {
+          codepoint_buf += buf;
+          if (utf8_len(codepoint_buf) < codepoint_buf.size())
+          {
+            dle_context.line.insert(dle_context.pos++, codepoint_buf);
+            codepoint_buf.clear();
+          }
+          else
+            continue ;
+        }
         // Input a character should close the history searching and competion.
         dle_context.searching_history_pattern.clear();
-        if(!dle_context.completion.empty())
+        if (!dle_context.completion.empty())
           complete_clear();
         dle_context.completion_pos_line = 0;
         dle_context.completion_pos_column = 0;
-        ++dle_context.pos;
         edit_refresh_line(dish_context.lua_state["dish"]["enable_hint"]);
       }
     }
