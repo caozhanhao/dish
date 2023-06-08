@@ -67,8 +67,6 @@ namespace dish::line_editor
   void dle_write(const tiny_utf8::string& str)
   {
     std::cout.write(str.c_str(), str.size());
-    std::cout.flush();
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
   template<typename ...Args>
