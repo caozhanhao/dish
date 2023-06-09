@@ -3,7 +3,7 @@ Dish
 </h2> 
 
 <p align="center">
-<strong>A Simple Interactive Shell</strong>
+<strong>A Delightful Interactive Shell</strong>
 </p>
 
 <p align="center">
@@ -53,11 +53,17 @@ dish.alias = {
 
 ### Extending With Lua
 #### Custom Prompt
+##### dish.prompt
+- Returns a string
 ```lua
+function prompt() 
+    return ">> "
+end
 dish.prompt = my_prompt
 ```
-- `dish.prompt` is a function returns a string
 #### Embedded Lua Function
+One thing worth noting is that every argument passed to Lua is string.  
+
 ```lua
 function hello(str)
     return string.format("hello, %s", str);    
@@ -68,7 +74,6 @@ dish.func["hello"] = hello;
 $ hello dish
 hello, dish
 ```
-- One thing worth noting is that every argument passed to Lua is string.
 
 #### Completion/Hint
 ```lua
@@ -86,7 +91,7 @@ Two arguments will be passed to `dish.complete`/`dish.hint`
 - Return `table{ table {string1, string2}}}` or `table{ table {string1, string2, string3}}}`
 - `string1` is the raw string to be put on the command line
 - `string2` is the information you want to show when selecting completions
-- `string3` is the string you want to show when selecting completions (default = `string1`)
+- `string3` is the string you want to show when selecting completions (default = `string1`)  
 Selecting completions could be something like this:
 ```
 $ git string1
@@ -96,19 +101,20 @@ lines: 2/26
 ```
 ##### dish.hint
 ![](docs/images/hint.png)
-- Return a `string`
+- Return a `string`  
 Hint will be added after the pattern(the 2nd argument) on command line with a different color(defined int the config.lua)
-That could be something like this:
 
-#### Dish Functions for Lua
+#### Dish Interface
+##### dish.environment
+- Stores all environment variables in string
 ##### dish_get_tilde_path()
 - Return the current path with `$HOME` replaced by `~`
 ##### dish_get_shrunk_path()  
-Return the current path: 
+Return the current path:   
 - All the parent path will be replaced by its first character
 - `$HOME` is replaced by `~`
 ##### dish_add_history(timestamp, cmd)
-- Add a history
+- Add a history  
 
 ### Note
 Dish currently does not support scripting.
@@ -139,4 +145,4 @@ Dish currently does not support scripting.
 - Any contributions are welcomed, just send a PR.
 
 ### License
-- Dish is licensed under the Apache-2.0 license
+- Dish is licensed under the [Apache-2.0 license](LICENSE)
