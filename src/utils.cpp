@@ -120,7 +120,7 @@ namespace dish::utils
   tiny_utf8::string get_dir_name(const std::filesystem::directory_entry& dir_entry)
   {
     if (dir_entry.is_directory())
-      return std::filesystem::path(dir_entry.path().string()).filename().string();
+      return std::filesystem::path(dir_entry.path().string()).filename().string() + "/";
     return dir_entry.path().filename().string();
   }
 
@@ -188,6 +188,7 @@ namespace dish::utils
       for (auto &dir_entry: std::filesystem::directory_iterator{path_to_match})
       {
         auto name = get_dir_name(dir_entry);
+        if(name.back() == '/') name.pop_back();
         if (std::regex_match(name.cpp_str(), re))
         {
           if (name[0] == '.')
@@ -442,7 +443,12 @@ namespace dish::utils
           if (!std::filesystem::exists(path))
             return {};
           if (raw_complete.back() != '/') // path without '/'
-            return {path.filename().string() + "/"};
+          {
+            if(raw_complete == "~")
+              return {"~/"};
+            else
+              return {path.filename().string() + "/"};
+          }
           pattern_to_match = "";
           dit = std::filesystem::directory_iterator{curr / path};
         }
@@ -461,8 +467,7 @@ namespace dish::utils
       for (auto &dir_entry: dit)
       {
         auto abs = std::filesystem::absolute(dir_entry.path());
-        tiny_utf8::string name = get_dir_name(dir_entry) + "/";
-
+        tiny_utf8::string name = get_dir_name(dir_entry);
         if (begin_with(name, pattern_to_match))
           ret.emplace_back(name);
       }
