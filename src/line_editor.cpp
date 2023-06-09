@@ -67,6 +67,8 @@ namespace dish::line_editor
   void dle_write(const tiny_utf8::string& str)
   {
     std::cout.write(str.c_str(), str.size());
+    // DEBUG
+    // std::cout.flush();
   }
 
   template<typename ...Args>
@@ -281,14 +283,17 @@ namespace dish::line_editor
         return cmds.begin()->name.substr(dle_context.line.length());
     }
     // filesystem hint
-    if(auto files = utils::match_files_and_dirs(pattern); !files.empty())
+    if (auto files = utils::match_files_and_dirs(pattern); !files.empty())
     {
       auto [path, filename] = split_path(pattern);
-      if (!filename.empty() && utils::begin_with(files[0], filename))
-        return files[0].substr(filename.length());
-      else if (filename.empty() && utils::begin_with(files[0], path))
-        return files[0].substr(path.length());
-      return files[0];
+      tiny_utf8::string ret;
+      if (!path.empty() && utils::begin_with(files[0], path))
+        ret = files[0].substr(path.length());
+      else
+        ret = files[0];
+      if (!filename.empty() && utils::begin_with(ret, filename))
+        ret = ret.substr(filename.length());
+      return ret;
     }
     return "";
   }
@@ -673,7 +678,7 @@ namespace dish::line_editor
   void complete_clear()
   {
     // When there is only an item, we have noting to clear.
-    if (!dle_context.completion.empty() && dle_context.completion.size() != 1 && dle_context.completion[0].size() != 1)
+    if (!dle_context.completion.empty() && (dle_context.completion.size() != 1 || dle_context.completion[0].size() != 1))
     {
       size_t screen_lines = 1 + std::min(dle_context.completion_show_line_size, dle_context.completion[0].size());
       for (size_t i = 0; i < screen_lines; ++i)

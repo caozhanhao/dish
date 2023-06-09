@@ -75,8 +75,10 @@ namespace dish::utils
   bool has_wildcards(const tiny_utf8::string &s);
 
   std::optional<tiny_utf8::string> get_home();
+
+  std::optional<std::vector<tiny_utf8::string>> expand_wildcards(const tiny_utf8::string &s);
+
   std::optional<std::vector<tiny_utf8::string>> expand(const tiny_utf8::string &str);
-  
 
   template<typename STR_VIEW, typename T>
   T split(STR_VIEW str, STR_VIEW delims = " ")
@@ -111,15 +113,17 @@ namespace dish::utils
 
   bool is_executable(const std::filesystem::path& path);
 
-  bool begin_with(const tiny_utf8::string &a, const tiny_utf8::string &b);
-
-  std::set<Command> match_command(const tiny_utf8::string& pattern);
-
   std::tuple<CommandType, tiny_utf8::string> find_command(const tiny_utf8::string& cmd);
+
+  tiny_utf8::string tilde(const tiny_utf8::string &path);
+
+  // Dish Line Editor
 
   tiny_utf8::string get_human_readable_size(size_t sz);
 
-  tiny_utf8::string tilde(const tiny_utf8::string &path);
+  bool begin_with(const tiny_utf8::string &a, const tiny_utf8::string &b);
+
+  std::set<Command> match_command(const tiny_utf8::string& pattern);
 
   std::vector<tiny_utf8::string> match_files_and_dirs(const tiny_utf8::string& path);
 
