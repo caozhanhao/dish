@@ -44,13 +44,13 @@ namespace dish::job
     switch (type)
     {
       case RedirectType::input:
-        return open(get_filename().c_str(), O_RDONLY);
+        return open(get_filename().c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
         break;
       case RedirectType::overwrite:
-        return open(get_filename().c_str(), O_CREAT | O_TRUNC | O_WRONLY);
+        return open(get_filename().c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
         break;
       case RedirectType::append:
-        return open(get_filename().c_str(), O_CREAT | O_APPEND | O_WRONLY);
+        return open(get_filename().c_str(), O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR);
         break;
       case RedirectType::fd:
         return dup(get_description());
