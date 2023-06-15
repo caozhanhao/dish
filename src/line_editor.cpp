@@ -119,7 +119,7 @@ namespace dish::line_editor
 
   tiny_utf8::string get_color(int c)
   {
-    return fmt::format("\033[{}m", c);
+    return "\033[" + std::to_string(c) + "m";
   }
 
   tiny_utf8::string highlight_line()
@@ -331,12 +331,9 @@ namespace dish::line_editor
       complete_refresh();
   }
 
-  // raw, info, output
-  std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>>
-  get_argument_candidate()
+  std::vector<CompletionCandidate> get_argument_candidate()
   {
-    utils::Effect info_color = static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["info"].get<int>());
-    std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>> ret;
+    std::vector<CompletionCandidate> ret;
     // lua complete
     if (sol::protected_function h = dish_context.lua_state["dish"]["complete"]; h.valid())
     {
@@ -352,23 +349,17 @@ namespace dish::line_editor
           if (auto lhs = r.second.as<sol::table>()[1], rhs = r.second.as<sol::table>()[2];
               lhs.valid() && rhs.valid() && lhs.get_type() == sol::type::string && rhs.get_type() == sol::type::string)
           {
-            tiny_utf8::string output = lhs.get<std::string>();
+            tiny_utf8::string selection;
             if (auto raw_lua = r.second.as<sol::table>()[3];
                 raw_lua.valid() && raw_lua.get_type() == sol::type::string)
-            {
-              output = raw_lua.get<std::string>();
-            }
+              selection = raw_lua.get<std::string>();
+            else
+              selection = lhs.get<std::string>();
             ret.emplace_back(
-                    lhs.get<std::string>(),                               // output
-                    fmt::format("({})",
-                                utils::effect(rhs.get<std::string>(),
-                                                      info_color)),// info
-                    output                                                  // raw
-            );
-          }
-          else
-          {
-            break;
+                    CompletionCandidate{
+                            .completion = lhs.get<std::string>(),
+                            .info = rhs.get<std::string>(),
+                            .selection = selection});
           }
         }
       }
@@ -381,38 +372,30 @@ namespace dish::line_editor
         auto [path, filename] = split_path(dle_context.complete_pattern);
         tiny_utf8::string raw;
         raw = path + r;
-        ret.emplace_back(raw,   // raw
-                         "",    //info
-                         r);    // output
+        ret.emplace_back(CompletionCandidate{.completion = raw,
+                                             .info = "",
+                                             .selection = r});
       }
       dle_context.complete_pattern = "";
     }
     return ret;
   }
 
-  // raw, output, info
-  std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>>
-  get_cmd_candidate()
+  std::vector<CompletionCandidate> get_cmd_candidate()
   {
-    utils::Effect info_color = static_cast<utils::Effect>
-            (dish_context.lua_state["dish"]["style"]["info"].get<int>());
-    std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>>  ret;
+    std::vector<CompletionCandidate> ret;
     dle_context.complete_pattern = dle_context.line.substr(0, dle_context.pos);
     auto cmds = utils::match_command(dle_context.complete_pattern);
     for (auto &r: cmds)
     {
       tiny_utf8::string info;
       if (r.type == utils::CommandType::executable_file || r.type == utils::CommandType::executable_link)
-      {
-        info = fmt::format("({}, {})",
-                             utils::effect(utils::to_string(r.type), info_color),
-                             utils::effect(utils::get_human_readable_size(r.file_size), info_color));
-      }
+        info = utils::to_string(r.type) + ", " + utils::get_human_readable_size(r.file_size);
       else
-      {
-        info = fmt::format("({})", utils::effect(utils::to_string(r.type), info_color));
-      }
-      ret.emplace_back(r.name, info, r.name);
+        info = utils::to_string(r.type);
+      ret.emplace_back(CompletionCandidate{.completion = r.name,
+                                           .info = info,
+                                           .selection = r.name});
     }
     return ret;
   }
@@ -425,6 +408,7 @@ namespace dish::line_editor
     dle_context.completion_pos_line = 0;
     dle_context.completion_pos_column = 0;
     size_t columns = dle_screen_width() / (max_size + 2);
+    if(columns == 0) columns = 1;
     size_t lines = std::ceil(static_cast<double>(total) / static_cast<double>(columns));
     columns -= (lines * columns - total) / lines;
 
@@ -442,8 +426,9 @@ namespace dish::line_editor
 
   int complete_line()
   {
-    // output, info, raw
-    std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string, tiny_utf8::string>> items;
+    auto info_color = static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["info"]);
+    auto err_color = static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["error"]);
+    std::vector<CompletionCandidate> items;
     // command
     if (auto it = std::find(dle_context.line.begin(),
                             dle_context.line.begin() + dle_context.pos, ' ');
@@ -455,35 +440,61 @@ namespace dish::line_editor
     {
       items = get_argument_candidate();
     }
-    if (items.empty()) return 0;
+    if (items.empty())
+      return 0;
     else if(items.size() == 1)
     {
-      dle_context.completion = {{{"", std::get<0>(items[0])}}};
+      dle_context.completion = {{CompletionDisplay{items[0].completion, ""}}};
       complete_select();
       return 0;
     }
     auto max_size_item = std::max_element(items.cbegin(), items.cend(),
                                           [](auto &&a, auto &&b) {
-                                            return (utils::display_width(std::get<0>(a)) + utils::display_width(std::get<1>(a))<
-                                                    utils::display_width(std::get<0>(b)) + utils::display_width(std::get<1>(b)));
+                                            return (utils::display_width(a.info, a.selection) <
+                                                    utils::display_width(b.info, b.selection));
                                           });
-    size_t max_width = utils::display_width(std::get<0>(*max_size_item), std::get<1>(*max_size_item));
-    if(dle_screen_width() < max_width + 2)
-    {
-      complete_clear();
-      return -1;
-    }
+    size_t max_width = utils::display_width(max_size_item->info, max_size_item->selection) + 2;
+    max_width = (std::min)(max_width, static_cast<size_t>(dle_screen_width()));
     auto [columns, lines] = complete_init(items.size(), max_width);
     size_t line = 0;
     size_t column = 0;
     for (auto &r: items)
     {
-      auto [raw, info, out] = r;
-      tiny_utf8::string output = out;
-      output.insert(output.end(),
-                    tiny_utf8::string(max_width - utils::display_width(out,info), ' '));
-      output += info;
-      dle_context.completion[column][line] = {output, raw};
+      tiny_utf8::string selection = r.selection;
+      if(utils::display_width(r.selection, r.info) + 2 <= max_width)
+      {
+        // if selection is shorter than max_width, then add info.
+        if(!r.info.empty())
+        {
+          selection.insert(selection.end(),
+                           tiny_utf8::string(max_width - utils::display_width(r.selection, r.info) - 2, ' '));
+          selection += "(" + utils::effect(r.info, info_color) + ")";
+        }
+        else
+        {
+          selection.insert(selection.end(),
+                           tiny_utf8::string(max_width - utils::display_width(r.selection), ' '));
+        }
+      }
+      else
+      {
+        // otherwise we need to cut info or selection
+        if(!r.info.empty() && utils::display_width(r.selection) + 3 <= max_width)
+        {
+          tiny_utf8::string short_info;
+          short_info = r.info.substr(0, max_width - utils::display_width(r.selection) - 2);
+          selection += "(" + utils::effect(short_info, info_color) + utils::effect("~", err_color);
+        }
+        else
+        {
+          if(auto w = utils::display_width(selection); w <= max_width)
+            selection.insert(selection.end(), tiny_utf8::string(max_width - w, ' '));
+          else
+            selection = selection.substr(0, max_width - 1) + utils::effect("~", err_color);
+        }
+      }
+      auto s = utils::display_width(selection);
+      dle_context.completion[column][line] = {r.completion, selection};
       if (line < lines - 1)
         ++line;
       else
@@ -601,8 +612,8 @@ namespace dish::line_editor
 
   void complete_apply()
   {
-    const auto &completion = std::get<1>(dle_context.completion[dle_context.completion_pos_column]
-                                                               [dle_context.completion_pos_line]);
+    const auto &completion = dle_context.completion[dle_context.completion_pos_column]
+                                                               [dle_context.completion_pos_line].completion;
     if (dle_context.pos != 0 && dle_context.line[dle_context.pos - 1] != ' ')
     {
       int b = dle_context.pos;
@@ -619,7 +630,7 @@ namespace dish::line_editor
 
   void complete_refresh()
   {
-    size_t completion_col = utils::display_width(std::get<0>(dle_context.completion[0][0]));
+    size_t completion_col = utils::display_width(dle_context.completion[0][0].selection);
     size_t lines = dle_context.completion[0].size();
     size_t screen_lines = std::min(dle_context.completion_show_line_size, dle_context.completion[0].size());
     size_t columns = dle_context.completion.size();
@@ -635,7 +646,7 @@ namespace dish::line_editor
       for (size_t l = dle_context.completion_show_line_pos;
            l < lines && l < dle_context.completion_show_line_pos + dle_context.completion_show_line_size; ++l)
       {
-        const auto &line = std::get<0>(dle_context.completion[c][l]);
+        const auto &line = dle_context.completion[c][l].selection;
         if(!line.empty())
         {
           tiny_utf8::string out;

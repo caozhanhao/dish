@@ -30,6 +30,19 @@ namespace dish::line_editor
     tiny_utf8::string timestamp;
   };
 
+  struct CompletionCandidate
+  {
+    tiny_utf8::string completion;
+    tiny_utf8::string info;
+    tiny_utf8::string selection;
+  };
+
+  struct CompletionDisplay
+  {
+    tiny_utf8::string completion;
+    tiny_utf8::string selection;
+  };
+
   struct LineEditorContext
   {
     // edit
@@ -50,7 +63,7 @@ namespace dish::line_editor
     size_t completion_show_line_pos;
     size_t completion_show_line_size;
     tiny_utf8::string complete_pattern; // for highlight
-    std::vector<std::vector<std::tuple<tiny_utf8::string, tiny_utf8::string>>> completion; // output, raw_cmd
+    std::vector<std::vector<CompletionDisplay>> completion;
     bool searching_completion;
     size_t completion_pos_line;
     size_t completion_pos_column;
