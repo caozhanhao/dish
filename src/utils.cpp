@@ -225,7 +225,7 @@ namespace dish::utils
     auto home = home_opt.value();
     auto [it1, it2] = std::mismatch(path.cbegin(), path.cend(), home.cbegin(), home.cend());
     if (it2 == home.cend())
-      return "~" + path.substr(home.size());
+      return "~" + path.substr(home.length());
     return path;
 
   }
@@ -558,8 +558,8 @@ namespace dish::utils
       }
     }
     ret.pop_back();
-    if (auto i = path.rfind('/'); i != tiny_utf8::string::npos && i != path.size() - 1)
-      ret.insert(ret.size(), path.substr(i + 2));
+    if (auto i = path.rfind('/'); i != tiny_utf8::string::npos && i != path.length() - 1)
+      ret.insert(ret.end(), path.substr(i + 2));
     return ret;
   }
 }

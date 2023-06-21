@@ -25,6 +25,7 @@ namespace dish::lexer
 {
   enum class TokenType
   {
+    error,
     word, newline, pipe,
     lt, rt, lt_lt, lt_lt_lt, rt_rt, lt_and, rt_and, lt_rt, background,
     env_var,
@@ -36,22 +37,27 @@ namespace dish::lexer
   private:
     TokenType type;
     tiny_utf8::string content;
+    tiny_utf8::string error;
     std::size_t pos;
     std::size_t size;
   public:
     Token() = default;
-    Token(TokenType type_, tiny_utf8::string content_, std::size_t pos_, std::size_t size_)
-        : type(type_), content(std::move(content_)), pos(pos_), size(size_) {}
+    Token(TokenType type_, tiny_utf8::string content_, std::size_t pos_, std::size_t size_,
+          tiny_utf8::string error_ = "")
+        : type(type_), content(std::move(content_)), pos(pos_), size(size_), error(error_) {}
 
     TokenType get_type() const;
 
     tiny_utf8::string get_content() const;
+
+    tiny_utf8::string get_error() const;
 
     std::size_t get_pos() const;
 
     std::size_t get_size() const;
 
     void set_content(tiny_utf8::string c);
+    void set_error(tiny_utf8::string c);
   };
 }
 #endif

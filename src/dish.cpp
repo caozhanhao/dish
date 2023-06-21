@@ -39,7 +39,7 @@ namespace dish
 
   auto to_token(const tiny_utf8::string& cmd)
   {
-    return lexer::Lexer(cmd).get_all_tokens_no_check().value();
+    return lexer::Lexer(cmd).get_all_tokens_no_check();
   }
   void sigchld_handler(int sig)
   {

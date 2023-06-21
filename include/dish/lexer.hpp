@@ -40,10 +40,10 @@ namespace dish::lexer
   
     std::optional<std::vector<Token>> get_all_tokens();
 
-    std::optional<std::vector<Token>> get_all_tokens_no_check();
+    std::vector<Token> get_all_tokens_no_check();
 
   private:
-    std::optional<Token> get_token();
+    Token get_token();
     
     int check_cmd(const Token &token);
     

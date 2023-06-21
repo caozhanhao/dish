@@ -59,13 +59,8 @@ namespace dish::parser
             {
               tokens.erase(tokens.begin() + pos - 1);
               auto alias = lexer::Lexer(it.get<std::string>()).get_all_tokens_no_check();
-              if (!alias.has_value())
-              {
-                fmt::println(stderr, "Failed to parse alias.");
-                return -1;
-              }
-              tokens.insert(tokens.begin() + pos - 1, std::make_move_iterator(alias.value().begin()),
-                            std::make_move_iterator(alias.value().end()));
+              tokens.insert(tokens.begin() + pos - 1, std::make_move_iterator(alias.begin()),
+                            std::make_move_iterator(alias.end()));
             }
           }
           // glob and ~

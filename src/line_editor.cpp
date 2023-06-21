@@ -117,57 +117,67 @@ namespace dish::line_editor
     return (w.ws_col != 0 ? w.ws_col : 128);
   }
 
-  tiny_utf8::string get_color(int c)
+  utils::Effect get_style(const tiny_utf8::string& type)
   {
-    return "\033[" + std::to_string(c) + "m";
+    return static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"][type.cpp_str()].get<int>());
   }
 
   tiny_utf8::string highlight_line()
   {
-    int cmd_color = dish_context.lua_state["dish"]["style"]["cmd"];
-    int arg_color = dish_context.lua_state["dish"]["style"]["arg"];
-    int str_color = dish_context.lua_state["dish"]["style"]["string"];
-    int env_color = dish_context.lua_state["dish"]["style"]["env"];
-    int err_color = dish_context.lua_state["dish"]["style"]["error"];
+    auto cmd_color = get_style("cmd");
+    auto arg_color = get_style("arg");
+    auto str_color = get_style("string");
+    auto env_color = get_style("env");
+    auto err_color = get_style("error");
 
-    if (dle_context.line.empty()) return "";
+    auto tokens = lexer::Lexer(dle_context.line).get_all_tokens_no_check();
+
     tiny_utf8::string ret;
+    for(size_t i = 0; i < dle_context.line.length() && dle_context.line[i] == ' '; ++i)
+      ret += ' ';
 
-    auto it = dle_context.line.raw_cbegin();
-    for(;it < dle_context.line.raw_cend() && *it != ' '; ++it);
-    auto cmd = dle_context.line.substr(0, it - dle_context.line.raw_cbegin());
-
-    auto [type, cmd_path] = utils::find_command(cmd);
-    switch (type)
+    for(auto it = tokens.cbegin(); it != tokens.cend(); ++it)
     {
-      case utils::CommandType::not_found:
-      case utils::CommandType::not_executable:
-        ret += get_color(err_color) + cmd + get_color(0);
-        break;
-      case utils::CommandType::builtin:
-      case utils::CommandType::lua_func:
-      case utils::CommandType::executable_file:
-      case utils::CommandType::executable_link:
-        ret += get_color(cmd_color) + cmd + get_color(0);
-        break;
-    }
+      if(it->get_type() == lexer::TokenType::end) break ;
+      tiny_utf8::string curr_word = it->get_content();
+      tiny_utf8::string space;
+      for(size_t i = it->get_pos(); i < dle_context.line.length() && dle_context.line[i] == ' '; ++i)
+        space += ' ';
 
-    for (; it < dle_context.line.raw_cend(); ++it)
-    {
-      switch (*it)
+      if((it == tokens.cbegin() && it->get_type() == lexer::TokenType::word)
+          || ((it - 1)->get_type() == lexer::TokenType::pipe && it->get_type() == lexer::TokenType::word))
       {
-        case ' ':
-          ret += get_color(arg_color);
-          break;
-        case '$':
-          ret += get_color(env_color);
-          break;
-        case '"':
-          ret += get_color(str_color);
-          break;
+        auto [type, cmd_path] = utils::find_command(curr_word);
+        switch (type)
+        {
+          case utils::CommandType::not_found:
+          case utils::CommandType::not_executable:
+            ret += utils::effect(curr_word, err_color);
+            break;
+          case utils::CommandType::builtin:
+          case utils::CommandType::lua_func:
+          case utils::CommandType::executable_file:
+          case utils::CommandType::executable_link:
+            ret += utils::effect(curr_word, cmd_color);
+            break;
+        }
       }
-      ret += *it;
+      else if(it->get_type() == lexer::TokenType::env_var)
+        ret += utils::effect(curr_word, env_color);
+      else if(it->get_type() == lexer::TokenType::word)
+      {
+        if(curr_word[0] == '"')
+          ret += utils::effect(curr_word, str_color);
+        else
+          ret += utils::effect(curr_word, arg_color);
+      }
+      else if(it->get_type() == lexer::TokenType::error)
+        ret += utils::effect(curr_word, err_color);
+      else
+        ret += curr_word;
+      ret += space;
     }
+
     if (!dle_context.searching_history_pattern.empty())
     {
       auto beg = ret.find(dle_context.searching_history_pattern);
@@ -177,7 +187,9 @@ namespace dish::line_editor
         ret.insert(beg + 9 + dle_context.searching_history_pattern.length(), "\033[49m");
       }
     }
-    ret += get_color(0);
+    size_t a = utils::display_width(ret);
+    size_t b = utils::display_width(dle_context.line);
+    assert(a == b);
     return ret;
   }
 
@@ -312,8 +324,7 @@ namespace dish::line_editor
     if (with_hints)
     {
       dle_context.hint = get_hint();
-      dle_write(utils::effect(dle_context.hint,
-                              static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["hint"].get<int>())));
+      dle_write(utils::effect(dle_context.hint, get_style("hint")));
     }
     // move cursor back
     auto cursor_col = dle_pos_width();
@@ -426,8 +437,8 @@ namespace dish::line_editor
 
   int complete_line()
   {
-    auto info_color = static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["info"]);
-    auto err_color = static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"]["error"]);
+    auto info_color = get_style("info");
+    auto err_color = get_style("error");
     std::vector<CompletionCandidate> items;
     // command
     if (auto it = std::find(dle_context.line.begin(),
