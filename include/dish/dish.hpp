@@ -16,22 +16,22 @@
 #pragma once
 
 #include "dish_lua.hpp"
+#include "type_alias.hpp"
 #include "utils.hpp"
 
-#include <sys/types.h>
 #include <termios.h>
-#include <unistd.h>
 
-#include <string>
-#include <vector>
-#include <list>
 #include <atomic>
+#include <list>
 #include <memory>
-#include <map>
+#include <vector>
 
 namespace dish
 {
-  namespace job{class Job;}
+  namespace job
+  {
+    class Job;
+  }
 
   struct DishContext
   {
@@ -51,14 +51,14 @@ namespace dish
   extern DishContext dish_context;
 
   void dish_init();
-  
-  void run_command(const tiny_utf8::string &cmd);
-  
-  std::list<tiny_utf8::string> get_history();
-  
+
+  void run_command(const String &cmd);
+
+  std::list<String> get_history();
+
   void do_job_notification();
 
-  std::vector<tiny_utf8::string> get_path(bool with_curr = true);
-  tiny_utf8::string dish_default_prompt();
-}
+  std::vector<String> get_path(bool with_curr = true);
+  String dish_default_prompt();
+}// namespace dish
 #endif

@@ -17,16 +17,16 @@
 #include "dish/dish.hpp"
 #include "dish/dish_lua.hpp"
 #include "dish/job.hpp"
-#include "dish/utils.hpp"
 #include "dish/line_editor.hpp"
+#include "dish/utils.hpp"
 
 #include <unistd.h>
 
-#include <vector>
-#include <list>
 #include <algorithm>
 #include <filesystem>
+#include <list>
 #include <string>
+#include <vector>
 
 namespace dish::builtin
 {
@@ -37,13 +37,13 @@ namespace dish::builtin
       fmt::println(stderr, "cd: too many arguments.");
       return -1;
     }
-    else if(args.size() < 1)
+    else if (args.size() < 1)
     {
       fmt::println(stderr, "cd: too few arguments.");
       return -1;
     }
-  
-    tiny_utf8::string last_dir = std::filesystem::current_path().string();
+
+    String last_dir = std::filesystem::current_path().string();
 
     if (args.size() == 1)
     {
@@ -58,20 +58,18 @@ namespace dish::builtin
         fmt::println(stderr, "cd: {}", strerror(errno));
         return -1;
       }
-      dish_context.lua_state["dish"]["environment"]["PWD"]
-              = home_opt.value().cpp_str();
+      dish_context.lua_state["dish"]["environment"]["PWD"] = home_opt.value().cpp_str();
     }
-    else if(args[1] == "-")
+    else if (args[1] == "-")
     {
-      if(dish_context.lua_state["dish"]["last_dir"].valid())
+      if (dish_context.lua_state["dish"]["last_dir"].valid())
       {
-        if (chdir(dish_context.lua_state["dish"]["last_dir"].get<const char*>()) != 0)
+        if (chdir(dish_context.lua_state["dish"]["last_dir"].get<const char *>()) != 0)
         {
           fmt::println(stderr, "cd: {}", strerror(errno));
           return -1;
         }
-        dish_context.lua_state["dish"]["environment"]["PWD"]
-        = dish_context.lua_state["dish"]["last_dir"];
+        dish_context.lua_state["dish"]["environment"]["PWD"] = dish_context.lua_state["dish"]["last_dir"];
       }
       else
       {
@@ -100,7 +98,7 @@ namespace dish::builtin
     }
     else
     {
-      if(auto s = dish_context.lua_state["dish"]["environment"]["PWD"]; s.valid())
+      if (auto s = dish_context.lua_state["dish"]["environment"]["PWD"]; s.valid())
         fmt::println(s.get<std::string>());
       else
       {
@@ -114,15 +112,15 @@ namespace dish::builtin
 
   int builtin_export(Args args)
   {
-    if(args.size() == 1)
+    if (args.size() == 1)
     {
       for (auto &r: dish_context.lua_state["dish"]["environment"].get<sol::table>())
-        fmt::println("{}={}", r.first.as<tiny_utf8::string>(), r.second.as<tiny_utf8::string>());
+        fmt::println("{}={}", r.first.as<std::string>(), r.second.as<std::string>());
     }
-    else if(args.size() == 2)
+    else if (args.size() == 2)
     {
       auto eq = args[1].find('=');
-      if(eq != tiny_utf8::string::npos)
+      if (eq != String::npos)
       {
         auto name = args[1].substr(0, eq);
         auto value = args[1].substr(eq + 1);
@@ -136,12 +134,12 @@ namespace dish::builtin
 
   int builtin_unset(Args args)
   {
-    if(args.size() < 2)
+    if (args.size() < 2)
     {
       fmt::println(stderr, "unset: too few arguments.");
       return -1;
     }
-    else if(args.size() > 2)
+    else if (args.size() > 2)
     {
       fmt::println(stderr, "unset: too many arguments.");
       return -1;
@@ -149,7 +147,7 @@ namespace dish::builtin
     else
     {
       auto it = dish_context.lua_state["dish"]["environment"][args[1].cpp_str()];
-      if(!it.valid())
+      if (!it.valid())
       {
         fmt::println(stderr, "unset: Unknown name.");
         return -1;
@@ -163,9 +161,9 @@ namespace dish::builtin
   {
     for (size_t i = 0; i < dish_context.jobs.size(); ++i)
     {
-      auto& job = utils::list_at(dish_context.jobs, i);
+      auto &job = utils::list_at(dish_context.jobs, i);
       job->update_status();
-      tiny_utf8::string job_info;
+      String job_info;
       if (job->is_completed())
         job_info = job->format_job_info("completed");
       else if (job->is_stopped())
@@ -280,15 +278,15 @@ namespace dish::builtin
 
   int builtin_alias(Args args)
   {
-    if(args.size() == 1)
+    if (args.size() == 1)
     {
-      for(auto& r : dish_context.lua_state["dish"]["alias"].get<sol::table>())
-        fmt::println("{}={}", r.first.as<tiny_utf8::string>(), r.second.as<tiny_utf8::string>());
+      for (auto &r: dish_context.lua_state["dish"]["alias"].get<sol::table>())
+        fmt::println("{}={}", r.first.as<String>(), r.second.as<String>());
     }
-    else if(args.size() == 2)
+    else if (args.size() == 2)
     {
       auto eq = args[1].find('=');
-      if(eq != tiny_utf8::string::npos)
+      if (eq != String::npos)
       {
         auto name = args[1].substr(0, eq);
         auto alias = args[1].substr(eq + 1);
@@ -307,7 +305,7 @@ namespace dish::builtin
   int builtin_history(Args args)
   {
     int i = 1;
-    for (auto &r : line_editor::dle_context.history)
+    for (auto &r: line_editor::dle_context.history)
     {
       fmt::println("{}| {}", i++, r.cmd);
     }
@@ -317,14 +315,13 @@ namespace dish::builtin
   int builtin_help(Args args)
   {
     std::vector<std::string> list;
-    for (auto &r:builtins)
+    for (auto &r: builtins)
       list.emplace_back(utils::cyan(r.first).cpp_str());
 
     fmt::println("{} \n {} \n {}",
-        "Dish - caozhanhao",
-        "These are builtin-commands. Use 'help' to see this.",
-        fmt::join(list, ", ")
-    );
+                 "Dish - caozhanhao",
+                 "These are builtin-commands. Use 'help' to see this.",
+                 fmt::join(list, ", "));
     return 0;
   }
 
@@ -367,23 +364,23 @@ namespace dish::builtin
   {
     args::ArgsParser args_parser;
     args_parser.add_description("Run a dish script (currently lua).");
-    args_parser.add_option<tiny_utf8::string>("__self", "")
+    args_parser.add_option<String>("__self", "")
             .add_restrictor(args::existing_path());
-    args_parser.add_option<tiny_utf8::string>("path", "p")
+    args_parser.add_option<String>("path", "p")
             .add_restrictor(args::existing_path())
             .add_description("Run from path.");
-    args_parser.add_option<tiny_utf8::string>("str", "s")
+    args_parser.add_option<String>("str", "s")
             .add_description("Run from string.");
     args_parser.add_help("help", "h")
             .add_description("Show this help.");
     args_parser.parse(args);
 
-    if (auto p = args_parser.get<tiny_utf8::string>("path"); p.has_value())
+    if (auto p = args_parser.get<String>("path"); p.has_value())
       dish_context.lua_state.script_file(p.value().cpp_str(), &lua::dish_sol_error_handler);
-    else if(auto sp = args_parser.get<tiny_utf8::string>("__self"); sp.has_value())
+    else if (auto sp = args_parser.get<String>("__self"); sp.has_value())
       dish_context.lua_state.script_file(sp.value().cpp_str(), &lua::dish_sol_error_handler);
-    else if (auto s = args_parser.get<tiny_utf8::string>("str"); s.has_value())
+    else if (auto s = args_parser.get<String>("str"); s.has_value())
       dish_context.lua_state.script(s.value().cpp_str(), &lua::dish_sol_error_handler);
     return 0;
   }
-}
+}// namespace dish::builtin

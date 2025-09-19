@@ -15,21 +15,24 @@
 #define DISH_UTILS_HPP
 #pragma once
 
-#include "bundled/tinyutf8/tinyutf8.h"
-
-#include <list>
-#include <vector>
-#include <string>
-#include <set>
-#include <optional>
 #include <filesystem>
+#include <list>
+#include <optional>
+#include <set>
+#include <string>
+#include <vector>
 
 #define FMT_HEADER_ONLY
 #include "bundled/fmt/core.h"
 #include "bundled/fmt/xchar.h"
 
-template <> struct fmt::formatter<tiny_utf8::string> : formatter<std::string> {
-  auto format(tiny_utf8::string c, format_context& ctx) {
+#include "type_alias.hpp"
+
+template<>
+struct fmt::formatter<dish::String> : formatter<std::string>
+{
+  auto format(dish::String c, format_context &ctx)
+  {
     return formatter<std::string>::format(c.cpp_str(), ctx);
   }
 };
@@ -38,47 +41,72 @@ namespace dish::utils
 {
   enum class Effect : std::size_t
   {
-    bold = 1, faint, italic, underline, slow_blink, rapid_blink, color_reverse,
-    fg_black = 30, fg_red, fg_green, fg_yellow, fg_blue, fg_magenta, fg_cyan, fg_white,
-    bg_black = 40, bg_red, bg_green, bg_yellow, bg_blue, bg_magenta, bg_cyan, bg_white,
-    bg_shadow, bg_strong_shadow
+    bold = 1,
+    faint,
+    italic,
+    underline,
+    slow_blink,
+    rapid_blink,
+    color_reverse,
+    fg_black = 30,
+    fg_red,
+    fg_green,
+    fg_yellow,
+    fg_blue,
+    fg_magenta,
+    fg_cyan,
+    fg_white,
+    bg_black = 40,
+    bg_red,
+    bg_green,
+    bg_yellow,
+    bg_blue,
+    bg_magenta,
+    bg_cyan,
+    bg_white,
+    bg_shadow,
+    bg_strong_shadow
   };
-  
+
   enum class CommandType
   {
-    not_found, builtin, lua_func, executable_file, executable_link,
+    not_found,
+    builtin,
+    lua_func,
+    executable_file,
+    executable_link,
     not_executable
   };
   struct Command
   {
-    tiny_utf8::string name;
+    String name;
     CommandType type;
     size_t file_size;
   };
 
-  tiny_utf8::string effect(const tiny_utf8::string &str, Effect effect);
-  template<typename ...Args>
-  tiny_utf8::string effect(const tiny_utf8::string &str, Effect e, Args&& ...effects)
+  String effect(const String &str, Effect effect);
+  template<typename... Args>
+  String effect(const String &str, Effect e, Args &&...effects)
   {
     if (str.empty()) return "";
     return effect(effect(str, e), effects...);
   }
-  tiny_utf8::string red(const tiny_utf8::string &str);
-  tiny_utf8::string green(const tiny_utf8::string &str);
-  tiny_utf8::string yellow(const tiny_utf8::string &str);
-  tiny_utf8::string blue(const tiny_utf8::string &str);
-  tiny_utf8::string magenta(const tiny_utf8::string &str);
-  tiny_utf8::string cyan(const tiny_utf8::string &str);
-  tiny_utf8::string white(const tiny_utf8::string &str);
-  
-  tiny_utf8::string get_dish_env(const tiny_utf8::string &s);
-  bool has_wildcards(const tiny_utf8::string &s);
+  String red(const String &str);
+  String green(const String &str);
+  String yellow(const String &str);
+  String blue(const String &str);
+  String magenta(const String &str);
+  String cyan(const String &str);
+  String white(const String &str);
 
-  std::optional<tiny_utf8::string> get_home();
+  String get_dish_env(const String &s);
+  bool has_wildcards(const String &s);
 
-  std::optional<std::vector<tiny_utf8::string>> expand_wildcards(const tiny_utf8::string &s);
+  std::optional<String> get_home();
 
-  std::vector<tiny_utf8::string> expand(const tiny_utf8::string &str);
+  std::optional<std::vector<String>> expand_wildcards(const String &s);
+
+  std::vector<String> expand(const String &str);
 
   template<typename STR_VIEW, typename T>
   T split(STR_VIEW str, STR_VIEW delims = " ")
@@ -98,46 +126,46 @@ namespace dish::utils
   }
 
   template<typename T>
-  auto&& list_at(const std::list<T>& list, size_t index)
+  auto &&list_at(const std::list<T> &list, size_t index)
   {
     auto it = list.begin();
     std::advance(it, index);
     return *it;
   }
 
-  tiny_utf8::string get_timestamp();
+  String get_timestamp();
 
-  tiny_utf8::string to_string(CommandType ct);
+  String to_string(CommandType ct);
 
-  bool operator<(const Command& a, const Command& b);
+  bool operator<(const Command &a, const Command &b);
 
-  bool is_executable(const std::filesystem::path& path);
+  bool is_executable(const std::filesystem::path &path);
 
-  std::tuple<CommandType, tiny_utf8::string> find_command(const tiny_utf8::string& cmd);
+  std::tuple<CommandType, String> find_command(const String &cmd);
 
-  tiny_utf8::string tilde(const tiny_utf8::string &path);
+  String tilde(const String &path);
 
   // Dish Line Editor
 
-  tiny_utf8::string get_human_readable_size(size_t sz);
+  String get_human_readable_size(size_t sz);
 
-  bool begin_with(const tiny_utf8::string &a, const tiny_utf8::string &b);
+  bool begin_with(const String &a, const String &b);
 
-  std::set<Command> match_command(const tiny_utf8::string& pattern);
+  std::set<Command> match_command(const String &pattern);
 
-  std::vector<tiny_utf8::string> match_files_and_dirs(const tiny_utf8::string& path);
+  std::vector<String> match_files_and_dirs(const String &path);
 
 
-  size_t display_width(const tiny_utf8::string::const_iterator& beg, const tiny_utf8::string::const_iterator& end);
+  size_t display_width(const String::const_iterator &beg, const String::const_iterator &end);
 
-  size_t display_width(const tiny_utf8::string &str);
+  size_t display_width(const String &str);
 
-  template<typename ...Args>
-  size_t display_width(const tiny_utf8::string &str, Args&& ...args)
+  template<typename... Args>
+  size_t display_width(const String &str, Args &&...args)
   {
     return display_width(str) + display_width(std::forward<Args>(args)...);
   }
 
-  tiny_utf8::string shrink_path(const tiny_utf8::string &path);
-}
+  String shrink_path(const String &path);
+}// namespace dish::utils
 #endif

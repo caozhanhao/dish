@@ -18,36 +18,44 @@
 #include "job.hpp"
 #include "token.hpp"
 
-#include <string>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace dish::lexer
 {
   enum class CmdState
   {
-    init, word_or_env, io_modifier_file_name,io_modifier_file_desc, pipe, file, background, end
+    init,
+    word_or_env,
+    io_modifier_file_name,
+    io_modifier_file_desc,
+    pipe,
+    file,
+    background,
+    end
   };
-  
+
   class Lexer
   {
   private:
-    tiny_utf8::string text;
+    String text;
     std::size_t pos;
     CmdState cmd_state;
+
   public:
-    Lexer(tiny_utf8::string cmd) : text(cmd), pos(0) {}
-  
+    Lexer(String cmd) : text(cmd), pos(0) {}
+
     std::optional<std::vector<Token>> get_all_tokens();
 
     std::vector<Token> get_all_tokens_no_check();
 
   private:
     Token get_token();
-    
+
     int check_cmd(const Token &token);
-    
-    tiny_utf8::string mark_error_from_token(const Token &token) const;
+
+    String mark_error_from_token(const Token &token) const;
   };
-}
+}// namespace dish::lexer
 #endif

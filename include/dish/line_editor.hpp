@@ -18,51 +18,53 @@
 #define DISH_LINE_EDITOR_HPP
 #pragma once
 
-#include <string>
+#include "dish/type_alias.hpp"
+
 #include <chrono>
+#include <string>
 #include <vector>
 
 namespace dish::line_editor
 {
   struct History
   {
-    tiny_utf8::string cmd;
-    tiny_utf8::string timestamp;
+    String cmd;
+    String timestamp;
   };
 
   struct CompletionCandidate
   {
-    tiny_utf8::string completion;
-    tiny_utf8::string info;
-    tiny_utf8::string selection;
+    String completion;
+    String info;
+    String selection;
   };
 
   struct CompletionDisplay
   {
-    tiny_utf8::string completion;
-    tiny_utf8::string selection;
+    String completion;
+    String selection;
   };
 
   struct LineEditorContext
   {
     // edit
-    tiny_utf8::string line;
+    String line;
     size_t pos;
     size_t last_cols;
 
     // history
     std::vector<History> history;
     size_t history_pos;
-    tiny_utf8::string searching_history_pattern;
+    String searching_history_pattern;
 
     //hint
-    tiny_utf8::string hint;
+    String hint;
 
     // complete
-    tiny_utf8::string prompt;
+    String prompt;
     size_t completion_show_line_pos;
     size_t completion_show_line_size;
-    tiny_utf8::string complete_pattern; // for highlight
+    String complete_pattern;// for highlight
     std::vector<std::vector<CompletionDisplay>> completion;
     bool searching_completion;
     size_t completion_pos_line;
@@ -73,11 +75,11 @@ namespace dish::line_editor
 
   void dle_init();
 
-  tiny_utf8::string read_line(const tiny_utf8::string &prompt);
+  String read_line(const String &prompt);
 
-  int save_history(const tiny_utf8::string &path);
+  int save_history(const String &path);
 
-  int load_history(const tiny_utf8::string &path);
+  int load_history(const String &path);
 
-}
+}// namespace dish::line_editor
 #endif

@@ -12,17 +12,17 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-#include "dish/utils.hpp"
-#include "dish/lexer.hpp"
-#include "dish/job.hpp"
 #include "dish/parser.hpp"
+#include "dish/job.hpp"
+#include "dish/lexer.hpp"
+#include "dish/utils.hpp"
 
 #include <string>
 #include <vector>
 
 namespace dish::parser
 {
-  Parser::Parser(const tiny_utf8::string &cmd, std::vector<lexer::Token> tokens_) : command(cmd), tokens(tokens_), pos(0) {}
+  Parser::Parser(const String &cmd, std::vector<lexer::Token> tokens_) : command(cmd), tokens(tokens_), pos(0) {}
 
   int Parser::parse()
   {
@@ -131,4 +131,4 @@ namespace dish::parser
     }
     return 0;
   }
-}
+}// namespace dish::parser

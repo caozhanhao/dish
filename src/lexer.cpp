@@ -12,11 +12,11 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-#include "dish/utils.hpp"
 #include "dish/lexer.hpp"
+#include "dish/utils.hpp"
 
-#include <string>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace dish::lexer
@@ -240,7 +240,7 @@ namespace dish::lexer
     if (pos < text.length() && text[pos] == '\n')
       return Token{TokenType::newline, "\\n", ++pos, 0};
     else if (pos < text.length() && text[pos] == '|')
-      return Token{TokenType::pipe, "|", pos+=1, 1};
+      return Token{TokenType::pipe, "|", pos += 1, 1};
     else if (pos < text.length() && text[pos] == '&')
       return Token{TokenType::background, "&", ++pos, 1};
     else if (pos < text.length() && text[pos] == '<')
@@ -271,7 +271,7 @@ namespace dish::lexer
     else if (pos < text.length() && text[pos] == '$')
     {
       ++pos;
-      tiny_utf8::string tmp = "$";
+      String tmp = "$";
       if (text[pos] == '{')
       {
         tmp += "{";
@@ -288,7 +288,7 @@ namespace dish::lexer
 
         if (pos == text.length() || text[pos] != '}')
         {
-          return {TokenType::error, tmp, pos,  tmp.length(),
+          return {TokenType::error, tmp, pos, tmp.length(),
                   "Syntax Error: Unexpected end of token."};
         }
         tmp += "}";
@@ -302,9 +302,9 @@ namespace dish::lexer
           ++pos;
         }
       }
-      if(tmp.length() == 1)
+      if (tmp.length() == 1)
       {
-        return {TokenType::error, tmp, pos,  tmp.length(),
+        return {TokenType::error, tmp, pos, tmp.length(),
                 "Syntax Error: Unexpected end of token."};
       }
       return Token{TokenType::env_var, tmp, pos, tmp.length()};
@@ -313,7 +313,7 @@ namespace dish::lexer
       return Token{TokenType::end, "end", 0, 0};
     else
     {
-      tiny_utf8::string tmp;
+      String tmp;
       bool parsing_str = false;
       while (pos < text.length() && (parsing_str || text[pos] != ' '))
       {
@@ -326,7 +326,7 @@ namespace dish::lexer
           tmp += text[pos];
         ++pos;
       }
-      if(parsing_str)
+      if (parsing_str)
         return Token{TokenType::error, tmp, pos, tmp.length(),
                      "Syntax Error: Unexpected end of token."};
       return Token{TokenType::word, tmp, pos, tmp.length()};
@@ -334,17 +334,17 @@ namespace dish::lexer
     return Token{TokenType::end, "end", 0, 0};
   }
 
-  tiny_utf8::string Lexer::mark_error_from_token(const Token &token) const
+  String Lexer::mark_error_from_token(const Token &token) const
   {
     std::size_t size = token.get_size();
     std::size_t errpos = token.get_pos();
-    tiny_utf8::string marked = text;
+    String marked = text;
     marked += "\n";
     if (errpos >= size)
-      marked += tiny_utf8::string(errpos - size, ' ');
+      marked += String(errpos - size, ' ');
     marked += "\033[0;32;32m";
-    marked += tiny_utf8::string(size, '^');
+    marked += String(size, '^');
     marked += "\033[m";
     return marked;
   }
-}
+}// namespace dish::lexer

@@ -14,28 +14,31 @@
 
 #include "dish/dish.hpp"
 #include "dish/line_editor.hpp"
+#include "dish/type_alias.hpp"
 #include "dish/utils.hpp"
+
+using namespace dish;
 
 int main(int argc, char **argv)
 {
-  dish::dish_init();
-  tiny_utf8::string history = dish::dish_context.lua_state["dish"]["history_path"].get<std::string>();
-  dish::line_editor::dle_init();
-  dish::line_editor::load_history(history);
-  while (dish::dish_context.running)
+  dish_init();
+  String history = dish_context.lua_state["dish"]["history_path"].get<std::string>();
+  line_editor::dle_init();
+  line_editor::load_history(history);
+  while (dish_context.running)
   {
-    tiny_utf8::string prompt;
-    if (sol::protected_function h = dish::dish_context.lua_state["dish"]["prompt"]; h.valid())
+    String prompt;
+    if (auto h = dish_context.lua_state["dish"]["prompt"]; h.valid())
     {
       auto res = h();
       if (res.valid() && res.get_type() == sol::type::string)
         prompt = res.get<std::string>();
     }
-    if(prompt.empty()) prompt = dish::dish_default_prompt();
+    if (prompt.empty()) prompt = dish_default_prompt();
 
-    tiny_utf8::string line = dish::line_editor::read_line(prompt);
-    dish::run_command(line);
+    String line = line_editor::read_line(prompt);
+    run_command(line);
   }
-  dish::line_editor::save_history(history);
+  line_editor::save_history(history);
   return 0;
 }

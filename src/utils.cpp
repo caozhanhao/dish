@@ -13,39 +13,39 @@
 //   limitations under the License.
 
 #include "dish/utils.hpp"
-#include "dish/dish.hpp"
 #include "dish/builtin.hpp"
+#include "dish/dish.hpp"
 
 #include "dish/bundled/widecharwidth/widechar_width.h"
 
-#include <sys/types.h>
 #include <dirent.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-#include <vector>
-#include <optional>
-#include <filesystem>
-#include <chrono>
-#include <list>
-#include <unordered_map>
-#include <set>
 #include <algorithm>
-#include <string>
-#include <string_view>
-#include <regex>
+#include <chrono>
+#include <codecvt>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <codecvt>
+#include <filesystem>
+#include <list>
+#include <optional>
+#include <regex>
+#include <set>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
 namespace dish::utils
 {
-  tiny_utf8::string effect(const tiny_utf8::string &str, Effect effect_)
+  String effect(const String &str, Effect effect_)
   {
     if (str.empty()) return "";
-    if(effect_ == utils::Effect::bg_shadow)
+    if (effect_ == utils::Effect::bg_shadow)
       return fmt::format("\033[48;5;7m{}\033[49m", str);
-    else if(effect_ == utils::Effect::bg_strong_shadow)
+    else if (effect_ == utils::Effect::bg_strong_shadow)
       return fmt::format("\033[48;5;8m{}\033[49m", str);
 
     int effect = static_cast<int>(effect_);
@@ -59,51 +59,51 @@ namespace dish::utils
     return fmt::format("\033[{}m{}\033[{}m", effect, str, end);
   }
 
-  tiny_utf8::string red(const tiny_utf8::string &str)
+  String red(const String &str)
   {
     return effect(str, Effect::fg_red);
   }
-  tiny_utf8::string green(const tiny_utf8::string &str)
+  String green(const String &str)
   {
     return effect(str, Effect::fg_green);
   }
-  tiny_utf8::string yellow(const tiny_utf8::string &str)
+  String yellow(const String &str)
   {
     return effect(str, Effect::fg_yellow);
   }
-  tiny_utf8::string blue(const tiny_utf8::string &str)
+  String blue(const String &str)
   {
     return effect(str, Effect::fg_blue);
   }
-  tiny_utf8::string magenta(const tiny_utf8::string &str)
+  String magenta(const String &str)
   {
     return effect(str, Effect::fg_magenta);
   }
-  tiny_utf8::string cyan(const tiny_utf8::string &str)
+  String cyan(const String &str)
   {
     return effect(str, Effect::fg_cyan);
   }
-  tiny_utf8::string white(const tiny_utf8::string &str)
+  String white(const String &str)
   {
     return effect(str, Effect::fg_white);
   }
 
-  tiny_utf8::string get_dish_env(const tiny_utf8::string &s)
+  String get_dish_env(const String &s)
   {
     if (auto it = dish_context.lua_state["dish"]["environment"][s.cpp_str()]; it.valid())
       return {it.get<std::string>()};
     return "";
   }
-  bool has_wildcards(const tiny_utf8::string &s)
+  bool has_wildcards(const String &s)
   {
-    return (s.find('*') != tiny_utf8::string::npos ||
-            s.find('?') != tiny_utf8::string::npos);
+    return (s.find('*') != String::npos ||
+            s.find('?') != String::npos);
   }
 
-  std::optional<tiny_utf8::string> get_home()
+  std::optional<String> get_home()
   {
-    tiny_utf8::string home;
-    const std::vector<tiny_utf8::string> env_to_find{"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"};
+    String home;
+    const std::vector<String> env_to_find{"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"};
     for (auto &r: env_to_find)
     {
       if (auto it = dish_context.lua_state["dish"]["environment"][r.cpp_str()]; it.valid())
@@ -117,25 +117,25 @@ namespace dish::utils
     return home;
   }
 
-  tiny_utf8::string get_dir_name(const std::filesystem::directory_entry& dir_entry)
+  String get_dir_name(const std::filesystem::directory_entry &dir_entry)
   {
     if (dir_entry.is_directory())
       return std::filesystem::path(dir_entry.path().string()).filename().string() + "/";
     return dir_entry.path().filename().string();
   }
 
-  std::optional<std::vector<tiny_utf8::string>> expand_wildcards(const tiny_utf8::string &str)
+  std::optional<std::vector<String>> expand_wildcards(const String &str)
   {
-    tiny_utf8::string name_to_match;
+    String name_to_match;
     std::filesystem::path path_to_match;
-    if (str.find('/') != tiny_utf8::string::npos)
+    if (str.find('/') != String::npos)
     {
       size_t wildcards_pos = 0;
       auto a = str.find('*');
       auto b = str.find('?');
-      if (a != tiny_utf8::string::npos)
+      if (a != String::npos)
         wildcards_pos = a;
-      if (b != tiny_utf8::string::npos && (a == tiny_utf8::string::npos || b < a))
+      if (b != String::npos && (a == String::npos || b < a))
         wildcards_pos = b;
 
       size_t beg = wildcards_pos;
@@ -159,7 +159,7 @@ namespace dish::utils
       name_to_match = str;
     }
 
-    tiny_utf8::string pattern{'^'};
+    String pattern{'^'};
     for (auto it = name_to_match.cbegin(); it < name_to_match.cend(); ++it)
     {
       auto ch = *it;
@@ -181,23 +181,23 @@ namespace dish::utils
     }
     pattern += '$';
 
-    std::vector<tiny_utf8::string> ret;
+    std::vector<String> ret;
     try
     {
       std::regex re(pattern.cpp_str());
       for (auto &dir_entry: std::filesystem::directory_iterator{path_to_match})
       {
         auto name = get_dir_name(dir_entry);
-        if(name.back() == '/') name.pop_back();
+        if (name.back() == '/') name.pop_back();
         if (std::regex_match(name.cpp_str(), re))
         {
           if (name[0] == '.')
           {
             if (name_to_match[0] == '.')
-              ret.emplace_back(tiny_utf8::string{path_to_match.string()} + name);
+              ret.emplace_back(String{path_to_match.string()} + name);
           }
           else
-            ret.emplace_back(tiny_utf8::string{path_to_match.string()} + name);
+            ret.emplace_back(String{path_to_match.string()} + name);
         }
       }
     } catch (...)
@@ -217,9 +217,9 @@ namespace dish::utils
     return ret;
   }
 
-  tiny_utf8::string tilde(const tiny_utf8::string &path_)
+  String tilde(const String &path_)
   {
-    tiny_utf8::string path = std::filesystem::path(path_.cpp_str()).lexically_normal().string();
+    String path = std::filesystem::path(path_.cpp_str()).lexically_normal().string();
     auto home_opt = get_home();
     if (!home_opt.has_value()) return path;
     auto home = home_opt.value();
@@ -227,14 +227,13 @@ namespace dish::utils
     if (it2 == home.cend())
       return "~" + path.substr(home.length());
     return path;
-
   }
 
-  tiny_utf8::string expand_tilde(const tiny_utf8::string& str)
+  String expand_tilde(const String &str)
   {
-    tiny_utf8::string ret;
+    String ret;
     auto home = get_home();
-    if(!home.has_value())
+    if (!home.has_value())
       return "";
     for (auto it = str.cbegin(); it < str.cend(); ++it)
     {
@@ -247,29 +246,29 @@ namespace dish::utils
     return ret;
   }
 
-  std::vector<tiny_utf8::string> expand(const tiny_utf8::string &str)
+  std::vector<String> expand(const String &str)
   {
-    if(str.empty()) return {};
-    tiny_utf8::string s = expand_tilde(str);
-    if(s.empty()) s = str;
+    if (str.empty()) return {};
+    String s = expand_tilde(str);
+    if (s.empty()) s = str;
 
     // Wildcards
     if (utils::has_wildcards(s))
     {
       auto w = expand_wildcards(s);
-      if(w.has_value() && !w.value().empty())
+      if (w.has_value() && !w.value().empty())
         return *w;
     }
     return {s};
   }
 
-  tiny_utf8::string get_timestamp()
+  String get_timestamp()
   {
     auto tp = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now());
     return std::to_string(std::chrono::duration_cast<std::chrono::seconds>(tp.time_since_epoch()).count());
   }
 
-  tiny_utf8::string to_string(CommandType ct)
+  String to_string(CommandType ct)
   {
     switch (ct)
     {
@@ -308,7 +307,7 @@ namespace dish::utils
             ((p & std::filesystem::perms::others_exec) != std::filesystem::perms::none));
   }
 
-  bool begin_with(const tiny_utf8::string &a, const tiny_utf8::string &b)
+  bool begin_with(const String &a, const String &b)
   {
     if (a.length() < b.length()) return false;
     for (size_t i = 0; i < b.length(); ++i)
@@ -320,7 +319,7 @@ namespace dish::utils
   }
 
 
-  std::tuple<CommandType, tiny_utf8::string> find_command(const tiny_utf8::string &cmd)
+  std::tuple<CommandType, String> find_command(const String &cmd)
   {
     if (builtin::builtins.find(cmd) != builtin::builtins.end())
       return {CommandType::builtin, cmd};
@@ -328,10 +327,10 @@ namespace dish::utils
     if (dish_context.lua_state["dish"]["func"][cmd.cpp_str()].valid())
       return {CommandType::lua_func, cmd};
 
-    try // such as permission denied
+    try// such as permission denied
     {
       bool found = false;
-      tiny_utf8::string abs_path;
+      String abs_path;
       for (auto path: get_path())
       {
         abs_path = path + "/" + cmd;
@@ -348,15 +347,14 @@ namespace dish::utils
       if (std::filesystem::is_symlink(std::filesystem::path(abs_path.cpp_str())))
         return {CommandType::executable_link, abs_path};
       return {CommandType::executable_file, abs_path};
-    }
-    catch (...)
+    } catch (...)
     {
       return {};
     }
     return {};
   }
 
-  tiny_utf8::string get_human_readable_size(size_t sz)
+  String get_human_readable_size(size_t sz)
   {
     int i = 0;
     double mantissa = sz;
@@ -366,14 +364,14 @@ namespace dish::utils
     return fmt::format("{}{}", mantissa, "BKMGTPE"[i]);
   }
 
-  std::set<Command> match_command(const tiny_utf8::string &pattern)
+  std::set<Command> match_command(const String &pattern)
   {
-    static std::unordered_map<tiny_utf8::string, std::set<Command>> cache;
+    static std::unordered_map<String, std::set<Command>> cache;
     static std::chrono::steady_clock::time_point last_cache_time = std::chrono::steady_clock::now();
-    if(auto d = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - last_cache_time);
+    if (auto d = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - last_cache_time);
         d.count() > 2)
       cache.clear();
-    if(auto it = cache.find(pattern); it != cache.end()) return it->second;
+    if (auto it = cache.find(pattern); it != cache.end()) return it->second;
     std::set<Command> ret;
     // builtin
     for (auto &r: builtin::builtins)
@@ -384,7 +382,7 @@ namespace dish::utils
     // lua function
     for (auto &r: dish_context.lua_state["dish"]["func"].get<sol::table>())
     {
-      auto fn = tiny_utf8::string(r.first.as<std::string>());
+      auto fn = String(r.first.as<std::string>());
       if (begin_with(fn, pattern))
         ret.insert(Command{fn, CommandType::lua_func, 0});
     }
@@ -396,7 +394,7 @@ namespace dish::utils
         for (auto &dir_entry: std::filesystem::directory_iterator{path.cpp_str()})
         {
           if (dir_entry.is_directory() || !is_executable(dir_entry.path())) continue;
-          if (begin_with(tiny_utf8::string(dir_entry.path().filename().string()), pattern))
+          if (begin_with(String(dir_entry.path().filename().string()), pattern))
           {
             auto size = std::filesystem::file_size(dir_entry.path());
             CommandType type = CommandType::executable_file;
@@ -406,8 +404,7 @@ namespace dish::utils
           }
         }
       }
-    }
-    catch (...)
+    } catch (...)
     {
       return ret;
     }
@@ -417,18 +414,18 @@ namespace dish::utils
   }
 
 
-  std::vector<tiny_utf8::string> match_files_and_dirs_no_wildcards(const tiny_utf8::string &raw_complete)
+  std::vector<String> match_files_and_dirs_no_wildcards(const String &raw_complete)
   {
-    tiny_utf8::string complete = expand_tilde(raw_complete);
-    if(!complete.empty() && complete.empty())
+    String complete = expand_tilde(raw_complete);
+    if (!complete.empty() && complete.empty())
       complete = raw_complete;
-    std::vector<tiny_utf8::string> ret;
-    try // such as permission denied
+    std::vector<String> ret;
+    try// such as permission denied
     {
       auto curr = std::filesystem::current_path();
       std::filesystem::directory_iterator dit;
-      tiny_utf8::string pattern_to_match;
-      if (complete.empty() || complete.find('/') == tiny_utf8::string::npos)
+      String pattern_to_match;
+      if (complete.empty() || complete.find('/') == String::npos)
       {
         // filename
         dit = std::filesystem::directory_iterator{curr};
@@ -442,9 +439,9 @@ namespace dish::utils
           // path
           if (!std::filesystem::exists(path))
             return {};
-          if (raw_complete.back() != '/') // path without '/'
+          if (raw_complete.back() != '/')// path without '/'
           {
-            if(raw_complete == "~")
+            if (raw_complete == "~")
               return {"~/"};
             else
               return {path.filename().string() + "/"};
@@ -458,7 +455,7 @@ namespace dish::utils
           if (!std::filesystem::exists(path.parent_path()))
             return {};
           pattern_to_match = expand_tilde(path.filename().string());
-          if(!path.filename().empty() && pattern_to_match.empty())
+          if (!path.filename().empty() && pattern_to_match.empty())
             pattern_to_match = path.filename().string();
           dit = std::filesystem::directory_iterator{path.parent_path()};
         }
@@ -467,38 +464,37 @@ namespace dish::utils
       for (auto &dir_entry: dit)
       {
         auto abs = std::filesystem::absolute(dir_entry.path());
-        tiny_utf8::string name = get_dir_name(dir_entry);
+        String name = get_dir_name(dir_entry);
         if (begin_with(name, pattern_to_match))
           ret.emplace_back(name);
       }
-    }
-    catch(...)
+    } catch (...)
     {
       return ret;
     }
     return ret;
   }
 
-  std::vector<tiny_utf8::string> match_files_and_dirs(const tiny_utf8::string &complete)
+  std::vector<String> match_files_and_dirs(const String &complete)
   {
-    static std::unordered_map<tiny_utf8::string, std::vector<tiny_utf8::string>> cache;
+    static std::unordered_map<String, std::vector<String>> cache;
     static std::chrono::steady_clock::time_point last_cache_time = std::chrono::steady_clock::now();
-    if(auto d = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - last_cache_time);
+    if (auto d = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - last_cache_time);
         d.count() > 2)
       cache.clear();
     auto curr = std::filesystem::current_path();
-    tiny_utf8::string curr_path_str = curr.string();
+    String curr_path_str = curr.string();
     auto cache_key = curr_path_str + "  |  " + complete;
     if (auto it = cache.find(cache_key); it != cache.end())
       return it->second;
 
-    std::vector<tiny_utf8::string> ret;
+    std::vector<String> ret;
 
     if (has_wildcards(complete))
     {
       auto expanded = expand(complete);
-      tiny_utf8::string pattern = expand_tilde(complete);
-      for (auto &r : expanded)
+      String pattern = expand_tilde(complete);
+      for (auto &r: expanded)
       {
         auto [it1, it2] = std::mismatch(r.cbegin(), r.cend(), pattern.cbegin(), pattern.cend());
         ret.emplace_back(r.substr(it1.get_index()));
@@ -512,10 +508,10 @@ namespace dish::utils
   }
 
 
-  size_t display_width(const tiny_utf8::string::const_iterator& beg, const tiny_utf8::string::const_iterator& end)
+  size_t display_width(const String::const_iterator &beg, const String::const_iterator &end)
   {
     // TODO Optimization
-    tiny_utf8::string no_ansi;
+    String no_ansi;
     for (auto it = beg; it < end; ++it)
     {
       if (*it == '\033')
@@ -528,21 +524,21 @@ namespace dish::utils
     std::u32string wide(no_ansi.length(), 0);
     no_ansi.to_wide_literal(&wide[0]);
     size_t width = 0;
-    for(auto& r : wide)
+    for (auto &r: wide)
       width += widechar_wcwidth(r);
     return width;
   }
 
 
-  size_t display_width(const tiny_utf8::string &str)
+  size_t display_width(const String &str)
   {
     return display_width(str.cbegin(), str.cend());
   }
 
-  tiny_utf8::string shrink_path(const tiny_utf8::string &path)
+  String shrink_path(const String &path)
   {
-    if(path == "/") return "/";
-    tiny_utf8::string ret;
+    if (path == "/") return "/";
+    String ret;
     if (path[0] != '/')
       ret += path[0];
     ret += "/";
@@ -556,8 +552,8 @@ namespace dish::utils
       }
     }
     ret.pop_back();
-    if (auto i = path.rfind('/'); i != tiny_utf8::string::npos && i != path.length() - 1)
+    if (auto i = path.rfind('/'); i != String::npos && i != path.length() - 1)
       ret.insert(ret.end(), path.substr(i + 2));
     return ret;
   }
-}
+}// namespace dish::utils

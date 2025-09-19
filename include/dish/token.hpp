@@ -17,8 +17,8 @@
 
 #include "job.hpp"
 
-#include <string>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace dish::lexer
@@ -26,8 +26,18 @@ namespace dish::lexer
   enum class TokenType
   {
     error,
-    word, newline, pipe,
-    lt, rt, lt_lt, lt_lt_lt, rt_rt, lt_and, rt_and, lt_rt, background,
+    word,
+    newline,
+    pipe,
+    lt,
+    rt,
+    lt_lt,
+    lt_lt_lt,
+    rt_rt,
+    lt_and,
+    rt_and,
+    lt_rt,
+    background,
     env_var,
     end
   };
@@ -36,28 +46,29 @@ namespace dish::lexer
   {
   private:
     TokenType type;
-    tiny_utf8::string content;
-    tiny_utf8::string error;
+    String content;
+    String error;
     std::size_t pos;
     std::size_t size;
+
   public:
     Token() = default;
-    Token(TokenType type_, tiny_utf8::string content_, std::size_t pos_, std::size_t size_,
-          tiny_utf8::string error_ = "")
+    Token(TokenType type_, String content_, std::size_t pos_, std::size_t size_,
+          String error_ = "")
         : type(type_), content(std::move(content_)), pos(pos_), size(size_), error(error_) {}
 
     TokenType get_type() const;
 
-    tiny_utf8::string get_content() const;
+    String get_content() const;
 
-    tiny_utf8::string get_error() const;
+    String get_error() const;
 
     std::size_t get_pos() const;
 
     std::size_t get_size() const;
 
-    void set_content(tiny_utf8::string c);
-    void set_error(tiny_utf8::string c);
+    void set_content(String c);
+    void set_error(String c);
   };
-}
+}// namespace dish::lexer
 #endif

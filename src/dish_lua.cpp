@@ -21,14 +21,14 @@ namespace dish::lua
   sol::protected_function_result dish_sol_error_handler(lua_State *L, sol::protected_function_result pfr)
   {
     std::exception_ptr eptr = std::current_exception();
-    tiny_utf8::string errmsg;
+    String errmsg;
     if (eptr) {
       try {
         std::rethrow_exception(eptr);
       } catch (const std::exception &ex) {
         errmsg += "std::exception -- ";
         errmsg.append(ex.what());
-      } catch (const tiny_utf8::string &message) {
+      } catch (const String &message) {
         errmsg += "message -- ";
         errmsg.append(message);
       } catch (const char *message) {
@@ -41,19 +41,19 @@ namespace dish::lua
     if (sol::type_of(L, pfr.stack_index()) == sol::type::string)
     {
       std::string_view serr = sol::stack::unqualified_get<std::string_view>(L, pfr.stack_index());
-      errmsg.append(tiny_utf8::string (serr.data(), serr.size()));
+      errmsg.append(String(serr.data(), serr.size()));
     }
 
     fmt::println(stderr, "Dish Lua Error:\n{} error:\n{}",
                  sol::to_string(pfr.status()), errmsg);
     return script_pass_on_error(L, std::move(pfr));
   }
-  int dish_sol_exception_handler(lua_State* L, sol::optional<const std::exception&> maybe_exception, sol::string_view description)
+  int dish_sol_exception_handler(lua_State *L, sol::optional<const std::exception &> maybe_exception, sol::string_view description)
   {
     fmt::println(stderr, "An exception occurred in a function ");
     if (maybe_exception)
     {
-      const std::exception& ex = *maybe_exception;
+      const std::exception &ex = *maybe_exception;
       fmt::println(stderr, "(straight from the exception):\n{}", ex.what());
     }
     else
@@ -64,4 +64,4 @@ namespace dish::lua
     }
     return sol::stack::push(L, description);
   }
-}
+}// namespace dish::lua

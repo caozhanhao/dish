@@ -19,16 +19,16 @@
 namespace dish::lexer
 {
   TokenType Token::get_type() const { return type; }
-  tiny_utf8::string Token::get_content() const { return content; }
-  tiny_utf8::string Token::get_error() const { return error; }
+  String Token::get_content() const { return content; }
+  String Token::get_error() const { return error; }
   std::size_t Token::get_pos() const { return pos; }
   std::size_t Token::get_size() const { return size; }
-  void Token::set_content(tiny_utf8::string c)
+  void Token::set_content(String c)
   {
     content = std::move(c);
   }
-  void Token::set_error(tiny_utf8::string c)
+  void Token::set_error(String c)
   {
     error = std::move(c);
   }
-}
+}// namespace dish::lexer

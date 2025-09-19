@@ -23,52 +23,61 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include <string>
 #include <list>
-#include <vector>
-#include <variant>
 #include <memory>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace dish::job
 {
   enum class RedirectType
   {
-    overwrite, append, input, fd
+    overwrite,
+    append,
+    input,
+    fd
   };
-  
+
   class Redirect
   {
   private:
     RedirectType type;
-    std::variant<int, tiny_utf8::string> redirect;
+    std::variant<int, String> redirect;
+
   public:
     Redirect() = default;
     template<typename T, typename = std::enable_if_t<!std::is_base_of_v<Redirect, std::decay_t<T>>>>
-    Redirect(RedirectType type_, T &&redirect_) : type(type_), redirect(redirect_) {}
-    
+    Redirect(RedirectType type_, T &&redirect_) : type(type_), redirect(redirect_)
+    {}
+
     bool is_description() const;
-    
-    tiny_utf8::string get_filename() const;
-    
+
+    String get_filename() const;
+
     int get_description() const;
-    
+
     int get() const;
   };
-  
+
   class Job;
   enum class ProcessType
   {
-    unknown, builtin, lua_func,
+    unknown,
+    builtin,
+    lua_func,
     executable
   };
 
   class Process
   {
     friend class Job;
+
   private:
     Job *job_context;
-    std::vector<tiny_utf8::string> args;
-    tiny_utf8::string cmd_path;
+    std::vector<String> args;
+    String cmd_path;
+
   public:
     ProcessType type;
     int pid;
@@ -76,62 +85,66 @@ namespace dish::job
     int exit_status;
     bool completed;
     bool stopped;
+
   public:
     Process()
         : pid(-1), status(-1), completed(false),
-          stopped(false), exit_status(-1), type(ProcessType::unknown), job_context(nullptr){}
+          stopped(false), exit_status(-1), type(ProcessType::unknown), job_context(nullptr) {}
 
     void launch();
-    
-    void insert(tiny_utf8::string str);
-    
+
+    void insert(String str);
+
     void clear();
-    
+
     bool empty() const;
-    
+
     void set_job_context(Job *job_);
 
     int find_cmd();
 
     std::vector<char *> get_args() const;
   };
-  
+
   class Job
   {
     friend class Process;
+
   private:
-    tiny_utf8::string command_str; //for message
+    String command_str;//for message
     Redirect out;
     Redirect in;
     Redirect err;
     struct termios job_tmodes;
     pid_t cmd_pgid;
     bool background;
+
   public:
     std::vector<Process> processes;
     bool notified;
+
   public:
     Job() = default;
-    Job(tiny_utf8::string cmd);
-    
+    Job(String cmd);
+
     int launch();
-    
+
     void insert(const Process &scmd);
-    
+
     void set_in(Redirect redirect);
-    
+
     void set_out(Redirect redirect);
-    
+
     void set_err(Redirect redirect);
-    
+
     void set_background();
 
     void set_foreground();
 
     void put_in_foreground(int cont);
-    
+
     void put_in_background(int cont);
-    
+
     bool is_stopped();
 
     bool is_background();
@@ -143,12 +156,13 @@ namespace dish::job
     void wait();
 
 
-    tiny_utf8::string format_job_info(const tiny_utf8::string &status);
+    String format_job_info(const String &status);
 
     void continue_job();
     void update_status();
+
   private:
     int mark_status(int, int);
   };
-}
+}// namespace dish::job
 #endif

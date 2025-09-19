@@ -12,32 +12,32 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-#include "dish/parser.hpp"
-#include "dish/lexer.hpp"
 #include "dish/job.hpp"
+#include "dish/lexer.hpp"
 #include "dish/line_editor.hpp"
+#include "dish/parser.hpp"
 #include "dish/utils.hpp"
 
+#include <pwd.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
-#include <signal.h>
-#include <pwd.h>
 
-#include <iostream>
-#include <string>
-#include <memory>
-#include <functional>
-#include <vector>
 #include <filesystem>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
 
-extern char ** environ;
+extern char **environ;
 
 namespace dish
 {
   dish::DishContext dish_context;
 
-  auto to_token(const tiny_utf8::string& cmd)
+  auto to_token(const String &cmd)
   {
     return lexer::Lexer(cmd).get_all_tokens_no_check();
   }
@@ -47,7 +47,7 @@ namespace dish
       do_job_notification();
   }
 
-  tiny_utf8::string dish_default_prompt()
+  String dish_default_prompt()
   {
     return (getuid() == 0 ? "#" : "$");
   }
@@ -100,15 +100,14 @@ namespace dish
     char **envir = environ;
     while (*envir)
     {
-      tiny_utf8::string tmp{*envir};
+      String tmp{*envir};
       auto eq = tmp.find('=');
-      if (eq == tiny_utf8::string::npos)
+      if (eq == String::npos)
       {
         fmt::println(stderr, "Unexpected env: {}", tmp);
         std::exit(-1);
       }
-      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq).cpp_str()]
-              = tmp.substr(eq + 1).cpp_str();
+      dish_context.lua_state["dish"]["environment"][tmp.substr(0, eq).cpp_str()] = tmp.substr(eq + 1).cpp_str();
       envir++;
     }
     dish_context.lua_state["dish"]["environment"]["PWD"] = std::filesystem::current_path().string();
@@ -130,19 +129,17 @@ namespace dish
     dish_context.lua_state["dish"]["last_dir"] = utils::get_home()->cpp_str();
     // history
     dish_context.lua_state["dish"]["history_path"] = utils::get_home()->cpp_str() + "/.local/share/dish/dish_history";
-    dish_context.lua_state["dish_add_history"]=
-            [](std::string timestamp, std::string cmd)
-    {
-      line_editor::dle_context.history.emplace_back
-              (line_editor::History{cmd, timestamp});
-    };
+    dish_context.lua_state["dish_add_history"] =
+            [](std::string timestamp, std::string cmd) {
+              line_editor::dle_context.history.emplace_back(line_editor::History{cmd, timestamp});
+            };
     // prompt
     dish_context.lua_state["dish"]["prompt"] = sol::nil;
     // prompt utils
     dish_context.lua_state["dish_get_tilde_path"] =
-            [](){return utils::tilde(std::filesystem::current_path().string()).cpp_str();};
+            []() { return utils::tilde(std::filesystem::current_path().string()).cpp_str(); };
     dish_context.lua_state["dish_get_shrunk_path"] =
-            [](){return utils::shrink_path(utils::tilde(std::filesystem::current_path().string())).cpp_str();};
+            []() { return utils::shrink_path(utils::tilde(std::filesystem::current_path().string())).cpp_str(); };
     // complete, hint
     dish_context.lua_state["dish"]["enable_hint"] = true;
     dish_context.lua_state["dish"]["hint"] = sol::nil;
@@ -187,8 +184,8 @@ namespace dish
     // load config
     dish_context.lua_state.script_file(utils::get_home().value().cpp_str() + "/.config/dish/config.lua");
   }
-  
-  void run_command(const tiny_utf8::string &cmd)
+
+  void run_command(const String &cmd)
   {
     lexer::Lexer lexer{cmd};
     auto tokens = lexer.get_all_tokens();
@@ -198,7 +195,7 @@ namespace dish
     dish_context.jobs.emplace_back(std::make_shared<job::Job>(parser.get_cmd()));
     dish_context.jobs.back()->launch();
   }
-  
+
   void do_job_notification()
   {
     for (auto job_it = dish_context.jobs.begin(); job_it != dish_context.jobs.end();)
@@ -207,13 +204,13 @@ namespace dish
       job->update_status();
       if (job->is_completed())
       {
-        if(job->is_background())
+        if (job->is_background())
           fmt::println("\n{}", job->format_job_info("completed"));
         job_it = dish_context.jobs.erase(job_it);
       }
       else if (job->is_stopped() && !job->notified)
       {
-        if(job->is_background())
+        if (job->is_background())
           fmt::println("\n{}", job->format_job_info("stopped"));
         job->notified = true;
         ++job_it;
@@ -224,13 +221,13 @@ namespace dish
     return;
   }
 
-  std::vector<tiny_utf8::string> get_path(bool with_curr)
+  std::vector<String> get_path(bool with_curr)
   {
-    std::vector<tiny_utf8::string> ret;
-    if(auto p = dish_context.lua_state["dish"]["environment"]["PATH"]; p.valid())
-      ret = utils::split<std::string_view, std::vector<tiny_utf8::string>>(p.get<std::string>(), ":");
-    if(with_curr)
+    std::vector<String> ret;
+    if (auto p = dish_context.lua_state["dish"]["environment"]["PATH"]; p.valid())
+      ret = utils::split<std::string_view, std::vector<String>>(p.get<std::string>(), ":");
+    if (with_curr)
       ret.emplace_back(std::filesystem::current_path().string());
     return ret;
   }
-}
+}// namespace dish

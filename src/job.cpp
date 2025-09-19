@@ -12,30 +12,30 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-#include "dish/utils.hpp"
-#include "dish/builtin.hpp"
 #include "dish/job.hpp"
+#include "dish/builtin.hpp"
+#include "dish/utils.hpp"
 
-#include <unistd.h>
-#include <sys/wait.h>
 #include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-#include <string>
-#include <variant>
-#include <thread>
-#include <filesystem>
 #include <algorithm>
-#include <vector>
-#include <list>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <list>
+#include <string>
+#include <thread>
+#include <variant>
+#include <vector>
 
 namespace dish::job
 {
   //Redirect
   bool Redirect::is_description() const { return redirect.index() == 0; }
 
-  tiny_utf8::string Redirect::get_filename() const { return std::get<tiny_utf8::string>(redirect); }
+  String Redirect::get_filename() const { return std::get<String>(redirect); }
 
   int Redirect::get_description() const { return std::get<int>(redirect); }
 
@@ -73,23 +73,23 @@ namespace dish::job
       completed = true;
       do_job_notification();
     }
-    else if(type == ProcessType::lua_func)
+    else if (type == ProcessType::lua_func)
     {
-      tiny_utf8::string s;
-      for(size_t i = 1; i < args.size(); ++i)
+      String s;
+      for (size_t i = 1; i < args.size(); ++i)
       {
         s += '"';
         s += args[i];
         s += '"';
-        if(i + 1 < args.size())
+        if (i + 1 < args.size())
           s += ", ";
       }
-      tiny_utf8::string script = fmt::format("print(dish.func.{}({}))", args[0], s);
+      String script = fmt::format("print(dish.func.{}({}))", args[0], s);
       dish_context.lua_state.script(script.cpp_str(), &lua::dish_sol_error_handler);
       completed = true;
       do_job_notification();
     }
-    else if(type == ProcessType::executable)
+    else if (type == ProcessType::executable)
     {
       childpid = fork();
       if (childpid == 0)
@@ -130,7 +130,7 @@ namespace dish::job
       fmt::println(stderr, "Unknown process.");
   }
 
-  void Process::insert(tiny_utf8::string str)
+  void Process::insert(String str)
   {
     args.emplace_back(std::move(str));
   }
@@ -148,7 +148,7 @@ namespace dish::job
   std::vector<char *> Process::get_args() const
   {
     std::vector<char *> cargs;
-    auto convert = [](const tiny_utf8::string &s) -> char * { return const_cast<char *>(s.c_str()); };
+    auto convert = [](const String &s) -> char * { return const_cast<char *>(s.c_str()); };
     std::transform(args.begin(), args.end(), std::back_inserter(cargs), convert);
     cargs.emplace_back(static_cast<char *>(nullptr));
     return cargs;
@@ -184,19 +184,19 @@ namespace dish::job
     return 0;
   }
 
-  Job::Job(tiny_utf8::string cmd)
+  Job::Job(String cmd)
       : out(RedirectType::fd, 0), in(RedirectType::fd, 1),
         err(RedirectType::fd, 2), background(false), command_str(std::move(cmd)),
         notified(false), cmd_pgid(0)
   {
-    tcgetattr (dish_context.terminal, &job_tmodes);
+    tcgetattr(dish_context.terminal, &job_tmodes);
   }
 
   int Job::launch()
   {
-    for(auto& r : processes)
+    for (auto &r: processes)
     {
-      if(r.find_cmd() != 0)
+      if (r.find_cmd() != 0)
         return -1;
     }
     int tmpin = dup(0);
@@ -443,17 +443,17 @@ namespace dish::job
 
   void Job::update_status()
   {
-    if(!is_builtin_or_lua())
+    if (!is_builtin_or_lua())
     {
       int status;
       pid_t pid;
       do
-        pid = waitpid(-1, &status, WUNTRACED|WNOHANG);
-      while(!mark_status(pid, status)&& !is_stopped() && !is_completed());
+        pid = waitpid(-1, &status, WUNTRACED | WNOHANG);
+      while (!mark_status(pid, status) && !is_stopped() && !is_completed());
     }
   }
 
-  [[nodiscard]]tiny_utf8::string Job::format_job_info(const tiny_utf8::string &status)
+  [[nodiscard]] String Job::format_job_info(const String &status)
   {
     return fmt::format("{} [{}]: {}", cmd_pgid, status, command_str);
   }
@@ -464,8 +464,8 @@ namespace dish::job
       p.stopped = false;
     notified = 0;
     if (!background)
-      put_in_foreground (1);
+      put_in_foreground(1);
     else
-      put_in_background (1);
+      put_in_background(1);
   }
-}
+}// namespace dish::job

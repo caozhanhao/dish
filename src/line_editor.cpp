@@ -12,18 +12,18 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-#include "dish/lexer.hpp"
 #include "dish/line_editor.hpp"
+#include "dish/lexer.hpp"
 #include "dish/utils.hpp"
 
-#include <iostream>
-#include <fstream>
 #include <algorithm>
-#include <vector>
+#include <fstream>
+#include <iostream>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <thread>
+#include <tuple>
+#include <vector>
 
 #include <sys/ioctl.h>
 
@@ -64,15 +64,15 @@ namespace dish::line_editor
     return (c >= 0 && c <= 6) || (c >= 8 && c <= 14) || c == 16 || c == 20 || c == 21 || c == 23 || c == 27 || c == 127;
   }
 
-  void dle_write(const tiny_utf8::string& str)
+  void dle_write(const String &str)
   {
     std::cout.write(str.c_str(), str.size());
     // DEBUG
     // std::cout.flush();
   }
 
-  template<typename ...Args>
-  void dle_write(const tiny_utf8::string& fmt, Args&& ...args)
+  template<typename... Args>
+  void dle_write(const String &fmt, Args &&...args)
   {
     dle_write(fmt::format(fmt.cpp_str(), std::forward<Args>(args)...));
   }
@@ -117,12 +117,12 @@ namespace dish::line_editor
     return (w.ws_col != 0 ? w.ws_col : 128);
   }
 
-  utils::Effect get_style(const tiny_utf8::string& type)
+  utils::Effect get_style(const String &type)
   {
     return static_cast<utils::Effect>(dish_context.lua_state["dish"]["style"][type.cpp_str()].get<int>());
   }
 
-  tiny_utf8::string highlight_line()
+  String highlight_line()
   {
     auto cmd_color = get_style("cmd");
     auto arg_color = get_style("arg");
@@ -132,20 +132,19 @@ namespace dish::line_editor
 
     auto tokens = lexer::Lexer(dle_context.line).get_all_tokens_no_check();
 
-    tiny_utf8::string ret;
-    for(size_t i = 0; i < dle_context.line.length() && dle_context.line[i] == ' '; ++i)
+    String ret;
+    for (size_t i = 0; i < dle_context.line.length() && dle_context.line[i] == ' '; ++i)
       ret += ' ';
 
-    for(auto it = tokens.cbegin(); it != tokens.cend(); ++it)
+    for (auto it = tokens.cbegin(); it != tokens.cend(); ++it)
     {
-      if(it->get_type() == lexer::TokenType::end) break ;
-      tiny_utf8::string curr_word = it->get_content();
-      tiny_utf8::string space;
-      for(size_t i = it->get_pos(); i < dle_context.line.length() && dle_context.line[i] == ' '; ++i)
+      if (it->get_type() == lexer::TokenType::end) break;
+      String curr_word = it->get_content();
+      String space;
+      for (size_t i = it->get_pos(); i < dle_context.line.length() && dle_context.line[i] == ' '; ++i)
         space += ' ';
 
-      if((it == tokens.cbegin() && it->get_type() == lexer::TokenType::word)
-          || ((it - 1)->get_type() == lexer::TokenType::pipe && it->get_type() == lexer::TokenType::word))
+      if ((it == tokens.cbegin() && it->get_type() == lexer::TokenType::word) || ((it - 1)->get_type() == lexer::TokenType::pipe && it->get_type() == lexer::TokenType::word))
       {
         auto [type, cmd_path] = utils::find_command(curr_word);
         switch (type)
@@ -162,16 +161,16 @@ namespace dish::line_editor
             break;
         }
       }
-      else if(it->get_type() == lexer::TokenType::env_var)
+      else if (it->get_type() == lexer::TokenType::env_var)
         ret += utils::effect(curr_word, env_color);
-      else if(it->get_type() == lexer::TokenType::word)
+      else if (it->get_type() == lexer::TokenType::word)
       {
-        if(curr_word[0] == '"')
+        if (curr_word[0] == '"')
           ret += utils::effect(curr_word, str_color);
         else
           ret += utils::effect(curr_word, arg_color);
       }
-      else if(it->get_type() == lexer::TokenType::error)
+      else if (it->get_type() == lexer::TokenType::error)
         ret += utils::effect(curr_word, err_color);
       else
         ret += curr_word;
@@ -181,7 +180,7 @@ namespace dish::line_editor
     if (!dle_context.searching_history_pattern.empty())
     {
       auto beg = ret.find(dle_context.searching_history_pattern);
-      if (beg != tiny_utf8::string::npos)
+      if (beg != String::npos)
       {
         ret.insert(beg, "\033[48;5;7m");
         ret.insert(beg + 9 + dle_context.searching_history_pattern.length(), "\033[49m");
@@ -193,7 +192,7 @@ namespace dish::line_editor
     return ret;
   }
 
-  int save_history(const tiny_utf8::string &path)
+  int save_history(const String &path)
   {
     std::ofstream fs(path.cpp_str());
     if (!fs.good())
@@ -207,7 +206,7 @@ namespace dish::line_editor
     return 0;
   }
 
-  int load_history(const tiny_utf8::string &path)
+  int load_history(const String &path)
   {
     std::ifstream fs(path.cpp_str());
     if (!fs.good())
@@ -218,25 +217,25 @@ namespace dish::line_editor
     std::string tmp;
     while (std::getline(fs, tmp))
     {
-      if (tmp.find(';') == tiny_utf8::string::npos)
+      if (tmp.find(';') == String::npos)
       {
         fmt::println(stderr, "Unknown history format. (path: '{}').", path);
         return -1;
       }
-      auto v = utils::split<std::string_view , std::vector<std::string>>(tmp, ";");
+      auto v = utils::split<std::string_view, std::vector<std::string>>(tmp, ";");
       dle_context.history.emplace_back(History{v[1], v[0]});
     }
     fs.close();
     return 0;
   }
 
-  std::tuple<tiny_utf8::string, tiny_utf8::string> split_path(const tiny_utf8::string& pattern)
+  std::tuple<String, String> split_path(const String &pattern)
   {
-    if(pattern.empty()) return {"", ""};
-    if(pattern == "/") return {"/", ""};
-    tiny_utf8::string path, filename;
+    if (pattern.empty()) return {"", ""};
+    if (pattern == "/") return {"/", ""};
+    String path, filename;
     auto i = pattern.rfind('/');
-    if(i == tiny_utf8::string::npos)
+    if (i == String::npos)
       filename = pattern;
     else
     {
@@ -246,14 +245,14 @@ namespace dish::line_editor
     return {path, filename};
   }
 
-  std::tuple<tiny_utf8::string, tiny_utf8::string> get_pattern()
+  std::tuple<String, String> get_pattern()
   {
-    tiny_utf8::string before_pattern;
-    tiny_utf8::string pattern;
+    String before_pattern;
+    String pattern;
     if (dle_context.line.back() != ' ')
     {
       auto i = dle_context.line.rfind(' ', dle_context.pos);
-      if (i != tiny_utf8::string::npos && i + 1 < dle_context.line.length())
+      if (i != String::npos && i + 1 < dle_context.line.length())
       {
         pattern = dle_context.line.substr(i + 1);
         before_pattern = dle_context.line.substr(0, i);
@@ -264,12 +263,12 @@ namespace dish::line_editor
     else
     {
       before_pattern = dle_context.line;
-      if(!before_pattern.empty()) before_pattern.pop_back();
+      if (!before_pattern.empty()) before_pattern.pop_back();
     }
     return {before_pattern, pattern};
   }
 
-  tiny_utf8::string get_hint()
+  String get_hint()
   {
     auto [before_pattern, pattern] = get_pattern();
     // lua hint
@@ -288,7 +287,7 @@ namespace dish::line_editor
     if (it != dle_context.history.crend())
       return it->cmd.substr(dle_context.line.length());
     // command hint
-    if (dle_context.line.find(' ') == tiny_utf8::string::npos)
+    if (dle_context.line.find(' ') == String::npos)
     {
       auto cmds = utils::match_command(dle_context.line);
       if (!cmds.empty())
@@ -298,7 +297,7 @@ namespace dish::line_editor
     if (auto files = utils::match_files_and_dirs(pattern); !files.empty())
     {
       auto [path, filename] = split_path(pattern);
-      tiny_utf8::string ret;
+      String ret;
       if (!path.empty() && utils::begin_with(files[0], path))
         ret = files[0].substr(path.length());
       else
@@ -329,7 +328,7 @@ namespace dish::line_editor
     // move cursor back
     auto cursor_col = dle_pos_width();
     auto curr_col = utils::display_width(dle_context.hint, dle_context.line);
-    if(curr_col != cursor_col)
+    if (curr_col != cursor_col)
       dle_write("\x1b[{}D", curr_col - cursor_col);
     // save pos for next refresh
     dle_context.last_cols = cursor_col;
@@ -360,7 +359,7 @@ namespace dish::line_editor
           if (auto lhs = r.second.as<sol::table>()[1], rhs = r.second.as<sol::table>()[2];
               lhs.valid() && rhs.valid() && lhs.get_type() == sol::type::string && rhs.get_type() == sol::type::string)
           {
-            tiny_utf8::string selection;
+            String selection;
             if (auto raw_lua = r.second.as<sol::table>()[3];
                 raw_lua.valid() && raw_lua.get_type() == sol::type::string)
               selection = raw_lua.get<std::string>();
@@ -381,7 +380,7 @@ namespace dish::line_editor
       for (auto &r: f)
       {
         auto [path, filename] = split_path(dle_context.complete_pattern);
-        tiny_utf8::string raw;
+        String raw;
         raw = path + r;
         ret.emplace_back(CompletionCandidate{.completion = raw,
                                              .info = "",
@@ -399,7 +398,7 @@ namespace dish::line_editor
     auto cmds = utils::match_command(dle_context.complete_pattern);
     for (auto &r: cmds)
     {
-      tiny_utf8::string info;
+      String info;
       if (r.type == utils::CommandType::executable_file || r.type == utils::CommandType::executable_link)
         info = utils::to_string(r.type) + ", " + utils::get_human_readable_size(r.file_size);
       else
@@ -419,13 +418,13 @@ namespace dish::line_editor
     dle_context.completion_pos_line = 0;
     dle_context.completion_pos_column = 0;
     size_t columns = dle_screen_width() / (max_size + 2);
-    if(columns == 0) columns = 1;
+    if (columns == 0) columns = 1;
     size_t lines = std::ceil(static_cast<double>(total) / static_cast<double>(columns));
     columns -= (lines * columns - total) / lines;
 
     dle_context.completion.insert(dle_context.completion.end(), columns, {});
     for (auto &r: dle_context.completion) r.insert(r.end(), lines, {"", ""});
-    if(lines > dle_screen_height() - 3)
+    if (lines > dle_screen_height() - 3)
       dle_context.completion_show_line_size = dle_screen_height() - 3;
     else
       dle_context.completion_show_line_size = lines;
@@ -453,7 +452,7 @@ namespace dish::line_editor
     }
     if (items.empty())
       return 0;
-    else if(items.size() == 1)
+    else if (items.size() == 1)
     {
       dle_context.completion = {{CompletionDisplay{items[0].completion, ""}}};
       complete_select();
@@ -465,41 +464,41 @@ namespace dish::line_editor
                                                     utils::display_width(b.info, b.selection));
                                           });
     size_t max_width = utils::display_width(max_size_item->info, max_size_item->selection) + 2;
-    max_width = (std::min)(max_width, static_cast<size_t>(dle_screen_width()));
+    max_width = (std::min) (max_width, static_cast<size_t>(dle_screen_width()));
     auto [columns, lines] = complete_init(items.size(), max_width);
     size_t line = 0;
     size_t column = 0;
     for (auto &r: items)
     {
-      tiny_utf8::string selection = r.selection;
-      if(utils::display_width(r.selection, r.info) + 2 <= max_width)
+      String selection = r.selection;
+      if (utils::display_width(r.selection, r.info) + 2 <= max_width)
       {
         // if selection is shorter than max_width, then add info.
-        if(!r.info.empty())
+        if (!r.info.empty())
         {
           selection.insert(selection.end(),
-                           tiny_utf8::string(max_width - utils::display_width(r.selection, r.info) - 2, ' '));
+                           String(max_width - utils::display_width(r.selection, r.info) - 2, ' '));
           selection += "(" + utils::effect(r.info, info_color) + ")";
         }
         else
         {
           selection.insert(selection.end(),
-                           tiny_utf8::string(max_width - utils::display_width(r.selection), ' '));
+                           String(max_width - utils::display_width(r.selection), ' '));
         }
       }
       else
       {
         // otherwise we need to cut info or selection
-        if(!r.info.empty() && utils::display_width(r.selection) + 3 <= max_width)
+        if (!r.info.empty() && utils::display_width(r.selection) + 3 <= max_width)
         {
-          tiny_utf8::string short_info;
+          String short_info;
           short_info = r.info.substr(0, max_width - utils::display_width(r.selection) - 2);
           selection += "(" + utils::effect(short_info, info_color) + utils::effect("~", err_color);
         }
         else
         {
-          if(auto w = utils::display_width(selection); w <= max_width)
-            selection.insert(selection.end(), tiny_utf8::string(max_width - w, ' '));
+          if (auto w = utils::display_width(selection); w <= max_width)
+            selection.insert(selection.end(), String(max_width - w, ' '));
           else
             selection = selection.substr(0, max_width - 1) + utils::effect("~", err_color);
         }
@@ -529,11 +528,11 @@ namespace dish::line_editor
     else
     {
       dle_context.completion_pos_column = dle_context.completion.size() - 1;
-      if(!from_complete_move)
+      if (!from_complete_move)
         complete_up(true);
     }
     complete_refresh();
-    if(auto& [c, r] = dle_context.completion[dle_context.completion_pos_column][dle_context.completion_pos_line];
+    if (auto &[c, r] = dle_context.completion[dle_context.completion_pos_column][dle_context.completion_pos_line];
         c.empty())
       complete_left();
   }
@@ -544,10 +543,10 @@ namespace dish::line_editor
     else
     {
       dle_context.completion_pos_column = 0;
-      if(!from_complete_move)
+      if (!from_complete_move)
         complete_down(true);
     }
-    if(auto& [c, r] = dle_context.completion[dle_context.completion_pos_column][dle_context.completion_pos_line];
+    if (auto &[c, r] = dle_context.completion[dle_context.completion_pos_column][dle_context.completion_pos_line];
         c.empty())
       complete_right();
   }
@@ -560,16 +559,16 @@ namespace dish::line_editor
     {
       dle_context.completion_pos_line = 0;
       dle_context.completion_show_line_pos = 0;
-      if(!from_complete_move)
+      if (!from_complete_move)
         complete_right(true);
     }
-    if(dle_context.completion_pos_line == dle_context.completion_show_line_pos + dle_context.completion_show_line_size)
+    if (dle_context.completion_pos_line == dle_context.completion_show_line_pos + dle_context.completion_show_line_size)
     {
-      if(dle_context.completion_show_line_pos <
+      if (dle_context.completion_show_line_pos <
           dle_context.completion[0].size() - dle_context.completion_show_line_size)
         ++dle_context.completion_show_line_pos;
     }
-    if(auto& [c, r] = dle_context.completion[dle_context.completion_pos_column][dle_context.completion_pos_line];
+    if (auto &[c, r] = dle_context.completion[dle_context.completion_pos_column][dle_context.completion_pos_line];
         c.empty())
       complete_down();
   }
@@ -583,15 +582,15 @@ namespace dish::line_editor
       dle_context.completion_pos_line = dle_context.completion[0].size() - 1;
       dle_context.completion_show_line_pos =
               dle_context.completion[0].size() - dle_context.completion_show_line_size;
-      if(!from_complete_move)
+      if (!from_complete_move)
         complete_left(true);
     }
-    if(dle_context.completion_pos_line + 1 == dle_context.completion_show_line_pos)
+    if (dle_context.completion_pos_line + 1 == dle_context.completion_show_line_pos)
     {
-      if(dle_context.completion_show_line_pos > 0)
+      if (dle_context.completion_show_line_pos > 0)
         --dle_context.completion_show_line_pos;
     }
-    if(auto& [c, r] = dle_context.completion[dle_context.completion_pos_column][dle_context.completion_pos_line];
+    if (auto &[c, r] = dle_context.completion[dle_context.completion_pos_column][dle_context.completion_pos_line];
         c.empty())
       complete_up();
   }
@@ -602,14 +601,14 @@ namespace dish::line_editor
     size_t ret = 0;
     auto i = dle_context.prompt.rfind('\n');
     auto j = dle_context.prompt.rfind('\r');
-    if (i != tiny_utf8::string::npos || j != tiny_utf8::string::npos)
+    if (i != String::npos || j != String::npos)
     {
       size_t last_line;
-      if (i == tiny_utf8::string::npos && j != tiny_utf8::string::npos)
+      if (i == String::npos && j != String::npos)
         last_line = j;
-      else if (i != tiny_utf8::string::npos && j == tiny_utf8::string::npos)
+      else if (i != String::npos && j == String::npos)
         last_line = i;
-      else if (i != tiny_utf8::string::npos && j != tiny_utf8::string::npos)
+      else if (i != String::npos && j != String::npos)
         last_line = std::min(i, j);
       ret += utils::display_width(dle_context.prompt.substr(last_line + 1));
     }
@@ -624,7 +623,8 @@ namespace dish::line_editor
   void complete_apply()
   {
     const auto &completion = dle_context.completion[dle_context.completion_pos_column]
-                                                               [dle_context.completion_pos_line].completion;
+                                                   [dle_context.completion_pos_line]
+                                                           .completion;
     if (dle_context.pos != 0 && dle_context.line[dle_context.pos - 1] != ' ')
     {
       int b = dle_context.pos;
@@ -645,7 +645,7 @@ namespace dish::line_editor
     size_t lines = dle_context.completion[0].size();
     size_t screen_lines = std::min(dle_context.completion_show_line_size, dle_context.completion[0].size());
     size_t columns = dle_context.completion.size();
-    tiny_utf8::string newline = "\n";
+    String newline = "\n";
     for (size_t i = 0; i < screen_lines; ++i)
       newline += "\n\x1b[2K";
     dle_write(newline);
@@ -658,9 +658,9 @@ namespace dish::line_editor
            l < lines && l < dle_context.completion_show_line_pos + dle_context.completion_show_line_size; ++l)
       {
         const auto &line = dle_context.completion[c][l].selection;
-        if(!line.empty())
+        if (!line.empty())
         {
-          tiny_utf8::string out;
+          String out;
           // highlight
           if (dle_context.searching_completion &&
               c == dle_context.completion_pos_column && l == dle_context.completion_pos_line)
@@ -681,7 +681,7 @@ namespace dish::line_editor
           dle_write("{}", out);
           dle_write("\x1b[{}D\x1b[1B", completion_col);
         }
-        else // Padding
+        else// Padding
           dle_write("\x1b[1D\x1b[1B");
       }
       if (c < columns - 1)
@@ -873,7 +873,7 @@ namespace dish::line_editor
       while (next_history() != -1)
       {
         auto f = dle_context.history[dle_context.history_pos].cmd.find(dle_context.searching_history_pattern);
-        if (f == tiny_utf8::string::npos)
+        if (f == String::npos)
           continue;
         found = true;
         break;
@@ -925,7 +925,7 @@ namespace dish::line_editor
     dle_write("\x1b[H\x1b[2J");
   }
 
-  int utf8_len(const std::string& s)
+  int utf8_len(const std::string &s)
   {
     int j, len = 0;
     for (int i = 0; s[i] != 0; i++)
@@ -1063,8 +1063,7 @@ namespace dish::line_editor
             if (!dle_context.completion.empty())
               complete_select();
             break;
-          case SpecialKey::CTRL_W:
-          {
+          case SpecialKey::CTRL_W: {
             if (!dle_context.completion.empty())
               complete_select();
             if (dle_context.pos == 0) break;
@@ -1195,7 +1194,7 @@ namespace dish::line_editor
       }
       else
       {
-        if(isprint(buf) || is_special_key(buf) || iscntrl(buf))
+        if (isprint(buf) || is_special_key(buf) || iscntrl(buf))
           dle_context.line.insert(dle_context.pos++, buf);
         else
         {
@@ -1206,7 +1205,7 @@ namespace dish::line_editor
             codepoint_buf.clear();
           }
           else
-            continue ;
+            continue;
         }
         // Input a character should close the history searching and competion.
         dle_context.searching_history_pattern.clear();
@@ -1220,7 +1219,7 @@ namespace dish::line_editor
     return -1;
   }
 
-  tiny_utf8::string read_line(const tiny_utf8::string &prompt)
+  String read_line(const String &prompt)
   {
     dle_context.prompt = prompt;
     dle_write(dle_context.prompt);
@@ -1228,4 +1227,4 @@ namespace dish::line_editor
     dle_write("\n");
     return dle_context.line;
   }
-}
+}// namespace dish::line_editor

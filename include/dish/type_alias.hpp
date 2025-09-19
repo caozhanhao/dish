@@ -11,35 +11,14 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-#ifndef DISH_PARSER_HPP
-#define DISH_PARSER_HPP
+#ifndef DISH_TYPE_ALIAS_HPP
+#define DISH_TYPE_ALIAS_HPP
 #pragma once
 
-#include "job.hpp"
-#include "lexer.hpp"
+#include "bundled/tinyutf8/tinyutf8.h"
 
-#include <string>
-#include <vector>
-
-namespace dish::parser
+namespace dish
 {
-  class Parser
-  {
-  private:
-    job::Job command;
-    job::Process scmd;
-    std::vector<lexer::Token> tokens;
-    std::size_t pos;
-
-  public:
-    Parser(const String &cmd, std::vector<lexer::Token> tokens_);
-
-    int parse();
-
-    job::Job get_cmd() const;
-
-  private:
-    int parse_cmd(job::Job &);
-  };
-}// namespace dish::parser
+  using String = tiny_utf8::string;
+}
 #endif
