@@ -67,8 +67,7 @@ namespace dish::parser
           if (tokens[pos - 1].get_type() == lexer::TokenType::word)
           {
             auto expanded = utils::expand(content);
-            if (!expanded.has_value()) return -1;
-            for (auto &r: expanded.value())
+            for (auto &r: expanded)
               scmd.insert(r);
           }
           // environment variable

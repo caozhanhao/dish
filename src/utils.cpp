@@ -247,9 +247,9 @@ namespace dish::utils
     return ret;
   }
 
-  std::optional<std::vector<tiny_utf8::string>> expand(const tiny_utf8::string &str)
+  std::vector<tiny_utf8::string> expand(const tiny_utf8::string &str)
   {
-    if(str.empty()) return {{}};
+    if(str.empty()) return {};
     tiny_utf8::string s = expand_tilde(str);
     if(s.empty()) s = str;
 
@@ -258,9 +258,9 @@ namespace dish::utils
     {
       auto w = expand_wildcards(s);
       if(w.has_value() && !w.value().empty())
-        return w;
+        return *w;
     }
-    return {{s}};
+    return {s};
   }
 
   tiny_utf8::string get_timestamp()
@@ -497,10 +497,8 @@ namespace dish::utils
     if (has_wildcards(complete))
     {
       auto expanded = expand(complete);
-      if (!expanded.has_value())
-        return {};
       tiny_utf8::string pattern = expand_tilde(complete);
-      for (auto &r: expanded.value())
+      for (auto &r : expanded)
       {
         auto [it1, it2] = std::mismatch(r.cbegin(), r.cend(), pattern.cbegin(), pattern.cend());
         ret.emplace_back(r.substr(it1.get_index()));

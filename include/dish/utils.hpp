@@ -78,7 +78,7 @@ namespace dish::utils
 
   std::optional<std::vector<tiny_utf8::string>> expand_wildcards(const tiny_utf8::string &s);
 
-  std::optional<std::vector<tiny_utf8::string>> expand(const tiny_utf8::string &str);
+  std::vector<tiny_utf8::string> expand(const tiny_utf8::string &str);
 
   template<typename STR_VIEW, typename T>
   T split(STR_VIEW str, STR_VIEW delims = " ")
