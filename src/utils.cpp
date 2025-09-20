@@ -327,19 +327,25 @@ namespace dish::utils
     if (dish_context.lua_state["dish"]["func"][cmd.cpp_str()].valid())
       return {CommandType::lua_func, cmd};
 
-    try// such as permission denied
+    try // catch exceptions such as permission denied
     {
-      bool found = false;
       String abs_path;
-      for (auto path: get_path())
-      {
-        abs_path = path + "/" + cmd;
-        if (std::filesystem::exists(abs_path.cpp_str()))
-        {
-          found = true;
-          break;
+      auto found = [&]() -> bool {
+        if (cmd.starts_with('/')) {
+          abs_path = cmd;
+          return std::filesystem::exists(abs_path.cpp_str());
         }
-      }
+
+        auto paths = get_path();
+        for (const auto &path: paths)
+        {
+          abs_path = path + "/" + cmd;
+          if (std::filesystem::exists(abs_path.cpp_str()))
+            return true;
+        }
+        return false;
+      }();
+
       if (!found)
         return {CommandType::not_found, ""};
       if (!is_executable(abs_path.cpp_str()))
@@ -349,7 +355,7 @@ namespace dish::utils
       return {CommandType::executable_file, abs_path};
     } catch (...)
     {
-      return {};
+      return {CommandType::not_found, ""};
     }
     return {};
   }

@@ -57,14 +57,14 @@ namespace dish::line_editor
     size_t history_pos;
     String searching_history_pattern;
 
-    //hint
+    // hint
     String hint;
 
     // complete
     String prompt;
     size_t completion_show_line_pos;
     size_t completion_show_line_size;
-    String complete_pattern;// for highlight
+    String complete_pattern; // for highlight
     std::vector<std::vector<CompletionDisplay>> completion;
     bool searching_completion;
     size_t completion_pos_line;

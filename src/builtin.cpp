@@ -281,7 +281,7 @@ namespace dish::builtin
     if (args.size() == 1)
     {
       for (auto &r: dish_context.lua_state["dish"]["alias"].get<sol::table>())
-        fmt::println("{}={}", r.first.as<String>(), r.second.as<String>());
+        fmt::println("{}={}", r.first.as<std::string>(), r.second.as<std::string>());
     }
     else if (args.size() == 2)
     {

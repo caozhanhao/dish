@@ -41,41 +41,34 @@ namespace dish::parser
     auto add_scmd = [&cmd, this]() {
       job::Process scmd;
       while (pos < tokens.size() && (tokens[pos].get_type() == lexer::TokenType::word ||
-                                     tokens[pos].get_type() == lexer::TokenType::env_var))
-      {
+                                     tokens[pos].get_type() == lexer::TokenType::env_var)) {
         auto content = tokens[pos++].get_content();
-        // optionls
-        if (!content.empty() && content[0] == '-')
+        // Subtitute alias
+        if (scmd.empty())
         {
-          scmd.insert(content);
+          auto it = dish_context.lua_state["dish"]["alias"][content.cpp_str()];
+          if (it.valid())
+          {
+            tokens.erase(tokens.begin() + pos - 1);
+            auto alias = lexer::Lexer(it.get<std::string>()).get_all_tokens_no_check();
+            content = alias[0].get_content();
+            tokens.insert(tokens.begin() + pos - 1, std::make_move_iterator(alias.begin()),
+                          std::make_move_iterator(alias.end()));
+          }
         }
+
+        // glob and ~
+        if (tokens[pos - 1].get_type() == lexer::TokenType::word)
+        {
+          auto expanded = utils::expand(content);
+          for (auto &r: expanded)
+            scmd.insert(r);
+        }
+        // environment variable
+        else if (tokens[pos - 1].get_type() == lexer::TokenType::env_var)
+          scmd.insert(utils::get_dish_env(content));
         else
-        {
-          // alias
-          if (scmd.empty())
-          {
-            auto it = dish_context.lua_state["dish"]["alias"][content.cpp_str()];
-            if (it.valid())
-            {
-              tokens.erase(tokens.begin() + pos - 1);
-              auto alias = lexer::Lexer(it.get<std::string>()).get_all_tokens_no_check();
-              tokens.insert(tokens.begin() + pos - 1, std::make_move_iterator(alias.begin()),
-                            std::make_move_iterator(alias.end()));
-            }
-          }
-          // glob and ~
-          if (tokens[pos - 1].get_type() == lexer::TokenType::word)
-          {
-            auto expanded = utils::expand(content);
-            for (auto &r: expanded)
-              scmd.insert(r);
-          }
-          // environment variable
-          else if (tokens[pos - 1].get_type() == lexer::TokenType::env_var)
-            scmd.insert(utils::get_dish_env(content));
-          else
-            scmd.insert(content);
-        }
+          scmd.insert(content);
       }
       cmd.insert(scmd);
       return 0;

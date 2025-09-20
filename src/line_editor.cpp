@@ -837,9 +837,13 @@ namespace dish::line_editor
 
   void edit_history_helper(bool prev)
   {
-    // first search should save the current line
-    if (dle_context.searching_history_pattern.empty())
+    // If this is the first search, save the line for next search and highlight.
+    // Otherwise, use the pattern saved previously
+    if (dle_context.history_pos == dle_context.history.size() - 1) {
+      dle_context.searching_history_pattern = dle_context.line;
       dle_context.history.back().cmd = dle_context.line;
+    }
+
     auto next_history = [prev]() -> int {
       auto origin = dle_context.history_pos;
       while (dle_context.history[origin].cmd == dle_context.history[dle_context.history_pos].cmd)
@@ -854,7 +858,7 @@ namespace dish::line_editor
         }
         else
         {
-          if (dle_context.history_pos != dle_context.history.size())
+          if (dle_context.history_pos != dle_context.history.size() - 1)
             ++dle_context.history_pos;
           else
             return -1;
@@ -862,14 +866,11 @@ namespace dish::line_editor
       }
       return 0;
     };
+
     if (!dle_context.line.empty())
     {
       auto origin = dle_context.history_pos;
       bool found = false;
-      // If this is the first search, save it for next search and highlight.
-      // Otherwise, restore the pattern saved previously
-      if (dle_context.searching_history_pattern.empty())
-        dle_context.searching_history_pattern = dle_context.line;
       while (next_history() != -1)
       {
         auto f = dle_context.history[dle_context.history_pos].cmd.find(dle_context.searching_history_pattern);
