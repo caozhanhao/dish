@@ -218,11 +218,10 @@ namespace dish::line_editor
     while (std::getline(fs, tmp))
     {
       if (tmp.find(';') == String::npos)
-      {
-        fmt::println(stderr, "Unknown history format. (path: '{}').", path);
-        return -1;
-      }
+        continue;
       auto v = utils::split<std::string_view, std::vector<std::string>>(tmp, ";");
+      if (v.size() != 2)
+        continue;
       dle_context.history.emplace_back(History{v[1], v[0]});
     }
     fs.close();
@@ -345,7 +344,7 @@ namespace dish::line_editor
   {
     std::vector<CompletionCandidate> ret;
     // lua complete
-    if (sol::protected_function h = dish_context.lua_state["dish"]["complete"]; h.valid())
+    if (auto h = dish_context.lua_state["dish"]["complete"]; h.valid())
     {
       auto [before_pattern, pattern] = get_pattern();
       dle_context.complete_pattern = pattern;

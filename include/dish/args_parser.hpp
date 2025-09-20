@@ -326,7 +326,7 @@ namespace dish::args
   String get_typename(int index)
   {
     if (index == -1 || index >= size_of_v<ArgsTypeList>) return "unknown";
-    static std::vector names{"null", "bool", "int", "double", "DString"};
+    static std::vector names{"null", "bool", "int", "double", "string"};
     return names[index];
   }
   template<typename T>
@@ -502,7 +502,7 @@ namespace dish::args
         fmt::println("options:");
         for (auto &r: long_name_index)
         {
-          //TODO improve '__self' information
+          // TODO improve '__self' information
           if (r.first == "__self") continue;
           auto &opt = options[r.second];
           if (!opt.short_name.empty())

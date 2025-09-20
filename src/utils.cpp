@@ -423,10 +423,8 @@ namespace dish::utils
   std::vector<String> match_files_and_dirs_no_wildcards(const String &raw_complete)
   {
     String complete = expand_tilde(raw_complete);
-    if (!complete.empty() && complete.empty())
-      complete = raw_complete;
     std::vector<String> ret;
-    try// such as permission denied
+    try // such as permission denied
     {
       auto curr = std::filesystem::current_path();
       std::filesystem::directory_iterator dit;
@@ -437,40 +435,26 @@ namespace dish::utils
         dit = std::filesystem::directory_iterator{curr};
         pattern_to_match = complete;
       }
-      else
-      {
+      else {
         std::filesystem::path path(complete.cpp_str());
-        if (std::filesystem::is_directory(path))
-        {
-          // path
-          if (!std::filesystem::exists(path))
-            return {};
-          if (raw_complete.back() != '/')// path without '/'
-          {
-            if (raw_complete == "~")
-              return {"~/"};
-            else
-              return {path.filename().string() + "/"};
-          }
-          pattern_to_match = "";
-          dit = std::filesystem::directory_iterator{curr / path};
-        }
-        else
-        {
-          // maybe broken filename
-          if (!std::filesystem::exists(path.parent_path()))
-            return {};
-          pattern_to_match = expand_tilde(path.filename().string());
-          if (!path.filename().empty() && pattern_to_match.empty())
-            pattern_to_match = path.filename().string();
-          dit = std::filesystem::directory_iterator{path.parent_path()};
-        }
+        // maybe broken filename
+        if (!std::filesystem::exists(path.parent_path()))
+          return {};
+        pattern_to_match = expand_tilde(path.filename().string());
+        if (!path.filename().empty() && pattern_to_match.empty())
+          pattern_to_match = path.filename().string();
+        dit = std::filesystem::directory_iterator{path.parent_path()};
       }
+
+      bool match_hidden = !pattern_to_match.empty() && pattern_to_match[0] == '.';
 
       for (auto &dir_entry: dit)
       {
         auto abs = std::filesystem::absolute(dir_entry.path());
         String name = get_dir_name(dir_entry);
+        if (name[0] == '.' && !match_hidden)
+          continue;
+
         if (begin_with(name, pattern_to_match))
           ret.emplace_back(name);
       }

@@ -49,7 +49,7 @@ namespace dish
 
   String dish_default_prompt()
   {
-    return (getuid() == 0 ? "#" : "$");
+    return (getuid() == 0 ? "# " : "$ ");
   }
 
   // Dish initialize

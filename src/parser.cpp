@@ -43,7 +43,10 @@ namespace dish::parser
       while (pos < tokens.size() && (tokens[pos].get_type() == lexer::TokenType::word ||
                                      tokens[pos].get_type() == lexer::TokenType::env_var)) {
         auto content = tokens[pos++].get_content();
-        // Subtitute alias
+        if (content.starts_with('"') && content.back() == '"' && content.size() > 2)
+          content = content.substr(1, content.size() - 2);
+
+        // Substitute alias
         if (scmd.empty())
         {
           auto it = dish_context.lua_state["dish"]["alias"][content.cpp_str()];
